@@ -36,11 +36,14 @@ test.describe('Dashboard and Navigation', () => {
     });
 
     await page.addInitScript(() => {
-      window.localStorage.setItem('saturn_token', 'mocked_token');
+      try {
+        window.localStorage.setItem('saturn_token', 'mocked_token');
+        document.cookie = 'saturn_token=mocked_token; path=/; SameSite=Lax';
+      } catch {}
     });
 
     // Mock typical dashboard endpoints
-    await page.route('**/api/docker/containers', async route => {
+    await page.route(url => url.pathname.includes('/api/docker/containers'), async route => {
       await route.fulfill({
         status: 200,
         json: [{

@@ -3,19 +3,19 @@ import { test, expect } from '@playwright/test';
 test.describe('App Store Flow', () => {
   test.beforeEach(async ({ page }) => {
     // Bypass auth and setup
-    await page.route('**/api/auth/status', async route => {
+    await page.route(url => url.pathname.includes('/api/auth/status'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { needs_setup: false } });
     });
 
-    await page.route('**/api/auth/me', async route => {
+    await page.route(url => url.pathname.includes('/api/auth/me'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { username: 'admin', role: 'admin' } });
     });
 
     // Mock system endpoints so layout and architecture filters load cleanly
-    await page.route('**/api/system/customization', async route => {
+    await page.route(url => url.pathname.includes('/api/system/customization'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: {} });
     });
-    await page.route('**/api/system/settings', async route => {
+    await page.route(url => url.pathname.includes('/api/system/settings'), async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -31,19 +31,22 @@ test.describe('App Store Flow', () => {
         }
       });
     });
-    await page.route('**/api/system/version', async route => {
+    await page.route(url => url.pathname.includes('/api/system/version'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { version: '4.0.0', arch: 'x86_64' } });
     });
-    await page.route('**/api/docker/containers', async route => {
+    await page.route(url => url.pathname.includes('/api/docker/containers'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: [] });
     });
 
     await page.addInitScript(() => {
-      window.localStorage.setItem('saturn_token', 'mocked_token');
+      try {
+        window.localStorage.setItem('saturn_token', 'mocked_token');
+        document.cookie = 'saturn_token=mocked_token; path=/; SameSite=Lax';
+      } catch {}
     });
 
     // Mock store apps
-    await page.route('**/api/store/apps', async route => {
+    await page.route(url => url.pathname.includes('/api/store/apps'), async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

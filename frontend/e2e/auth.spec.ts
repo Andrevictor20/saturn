@@ -3,13 +3,13 @@ import { test, expect } from '@playwright/test';
 test.describe('Login Flow', () => {
   test('should show error on invalid credentials', async ({ page }) => {
     // Mock setup status (setup already done)
-    await page.route('**/api/auth/status', async route => {
-      await route.fulfill({ status: 200, json: { needs_setup: false } });
+    await page.route(url => url.pathname.includes('/api/auth/status'), async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { needs_setup: false } });
     });
 
     // Mock the backend API response for a failed login
-    await page.route('**/api/auth/login', async route => {
-      await route.fulfill({ status: 401, json: { error: 'Credenciais inválidas.' } });
+    await page.route(url => url.pathname.includes('/api/auth/login'), async route => {
+      await route.fulfill({ status: 401, contentType: 'application/json', json: { error: 'Credenciais inválidas.' } });
     });
 
     await page.goto('/login');
@@ -23,25 +23,25 @@ test.describe('Login Flow', () => {
 
   test('should redirect to dashboard on successful login', async ({ page }) => {
     // Mock setup status (setup already done)
-    await page.route('**/api/auth/status', async route => {
+    await page.route(url => url.pathname.includes('/api/auth/status'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { needs_setup: false } });
     });
 
     // Mock successful login
-    await page.route('**/api/auth/login', async route => {
+    await page.route(url => url.pathname.includes('/api/auth/login'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { token: 'mock-token-123' } });
     });
 
     // Mock me endpoint
-    await page.route('**/api/auth/me', async route => {
+    await page.route(url => url.pathname.includes('/api/auth/me'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { username: 'admin', role: 'admin' } });
     });
 
     // Mock system endpoints for smooth dashboard bootstrap
-    await page.route('**/api/system/customization', async route => {
+    await page.route(url => url.pathname.includes('/api/system/customization'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: {} });
     });
-    await page.route('**/api/system/settings', async route => {
+    await page.route(url => url.pathname.includes('/api/system/settings'), async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -57,12 +57,12 @@ test.describe('Login Flow', () => {
         }
       });
     });
-    await page.route('**/api/system/version', async route => {
+    await page.route(url => url.pathname.includes('/api/system/version'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: { version: '4.0.0', arch: 'x86_64' } });
     });
 
     // Mock docker containers
-    await page.route('**/api/docker/containers', async route => {
+    await page.route(url => url.pathname.includes('/api/docker/'), async route => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: [] });
     });
 
