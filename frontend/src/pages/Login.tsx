@@ -195,7 +195,7 @@ export function Login() {
           )}
 
           {step === 'credentials' ? (
-            <form className="space-y-6" onSubmit={handleSubmit} action="#">
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-primary">
                   {t('auth.username', 'Usuário')}

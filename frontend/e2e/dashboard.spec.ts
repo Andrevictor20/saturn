@@ -43,7 +43,7 @@ test.describe('Dashboard and Navigation', () => {
     });
 
     // Mock typical dashboard endpoints
-    await page.route(url => url.pathname.includes('/api/docker/containers'), async route => {
+    await page.route('**/api/docker/containers*', async route => {
       await route.fulfill({
         status: 200,
         json: [{
