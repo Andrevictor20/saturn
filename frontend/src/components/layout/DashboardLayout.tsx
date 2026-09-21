@@ -113,20 +113,22 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Ambient orbs */}
-      <div className={`fixed inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-500 ${wallpaperUrl ? 'opacity-20' : 'opacity-80'}`}>
-        <div className="absolute -top-36 -right-32 w-[650px] h-[650px] rounded-full bg-gradient-to-br from-saturn-500/20 via-purple-600/12 to-transparent blur-[140px] opacity-80 animate-float-slow" />
-        <div className="absolute top-1/4 -left-48 w-[720px] h-[720px] rounded-full bg-gradient-to-tr from-saturn-600/16 via-cyan-500/10 to-transparent blur-[150px] opacity-75 animate-float-reverse" />
-        <div className="absolute -bottom-40 right-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tl from-indigo-500/16 via-pink-500/10 to-transparent blur-[140px] opacity-70 animate-pulse-glow" />
-        <div className="absolute bottom-1/4 left-1/3 w-[480px] h-[480px] rounded-full bg-gradient-to-r from-emerald-500/10 via-saturn-500/12 to-transparent blur-[130px] opacity-65 animate-float-slow animation-delay-2000" />
-      </div>
+      {/* Ambient orbs (active only when wallpaper is not present to avoid color bleeding) */}
+      {!wallpaperUrl && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-500 opacity-80">
+          <div className="absolute -top-36 -right-32 w-[650px] h-[650px] rounded-full bg-gradient-to-br from-saturn-500/20 via-purple-600/12 to-transparent blur-[140px] opacity-80 animate-float-slow" />
+          <div className="absolute top-1/4 -left-48 w-[720px] h-[720px] rounded-full bg-gradient-to-tr from-saturn-600/16 via-cyan-500/10 to-transparent blur-[150px] opacity-75 animate-float-reverse" />
+          <div className="absolute -bottom-40 right-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tl from-indigo-500/16 via-pink-500/10 to-transparent blur-[140px] opacity-70 animate-pulse-glow" />
+          <div className="absolute bottom-1/4 left-1/3 w-[480px] h-[480px] rounded-full bg-gradient-to-r from-emerald-500/10 via-saturn-500/12 to-transparent blur-[130px] opacity-65 animate-float-slow animation-delay-2000" />
+        </div>
+      )}
 
       {/* Mobile Backdrop */}
       {isMobileMenuOpen && <div onClick={() => setIsMobileMenuOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 md:hidden transition-opacity animate-in fade-in" aria-hidden="true" />}
 
       {/* Sidebar */}
-      <aside className={`border-r border-border/60 flex flex-col fixed inset-y-0 left-0 z-50 bg-card/55 backdrop-blur-3xl saturate-[190%] shadow-2xl transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 w-72 shadow-2xl' : '-translate-x-full'} md:translate-x-0 ${isSidebarOpen ? 'md:w-64' : 'md:w-16'}`}>
-        <div className="h-14 border-b border-border/60 flex items-center justify-between px-4 bg-card/35 backdrop-blur-3xl">
+      <aside className={`border-r border-border/60 flex flex-col fixed inset-y-0 left-0 z-50 bg-card/85 backdrop-blur-2xl shadow-2xl transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 w-72 shadow-2xl' : '-translate-x-full'} md:translate-x-0 ${isSidebarOpen ? 'md:w-64' : 'md:w-16'}`}>
+        <div className="h-14 border-b border-border/60 flex items-center justify-between px-4 bg-card/70 backdrop-blur-2xl">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <SaturnLogo size={28} className="shrink-0" />
             <div className={`flex flex-col ${(isSidebarOpen || isMobileMenuOpen) ? 'block' : 'hidden md:hidden'}`}>

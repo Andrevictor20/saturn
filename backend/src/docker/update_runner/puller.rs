@@ -35,9 +35,10 @@ pub async fn pull_updated_image(
         None,
     );
 
-    // 1. Safe Image Pull with stream validation BEFORE touching the existing container
+    // 1. Safe High-Speed Image Pull with explicit host platform constraint
     let create_image_options = bollard::query_parameters::CreateImageOptions {
         from_image: Some(image_name.to_string()),
+        platform: platform.to_string(),
         ..Default::default()
     };
     let mut pull_stream = docker.create_image(Some(create_image_options), None, None);
@@ -119,17 +120,15 @@ pub async fn pull_updated_image(
         }
     }
 
-    // 2. If default pull failed, retry with platform constraint
+    // 2. If platform-constrained pull failed, retry with unconstrained pull
     if pull_failed {
         tracing::warn!(
-            "Default pull for {} failed ({}), retrying with explicit platform {}...",
+            "Platform-constrained pull for {} failed ({}), retrying with unconstrained pull...",
             image_name,
-            pull_error_msg,
-            platform
+            pull_error_msg
         );
         let fallback_options = bollard::query_parameters::CreateImageOptions {
             from_image: Some(image_name.to_string()),
-            platform: platform.to_string(),
             ..Default::default()
         };
         let mut fallback_stream = docker.create_image(Some(fallback_options), None, None);

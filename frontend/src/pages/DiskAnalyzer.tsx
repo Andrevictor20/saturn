@@ -8,6 +8,7 @@ import {
   ArrowRight,
   FolderSearch,
   Compass,
+  Activity,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useDiskAnalyzerStore, diskAnalyzerStore } from '../stores/diskAnalyzerStore';
@@ -19,6 +20,7 @@ import { DiskTopConsumers } from '../components/disk/DiskTopConsumers';
 import { DiskDirectoryTree } from '../components/disk/DiskDirectoryTree';
 import { DiskInsightsTab } from '../components/disk/DiskInsightsTab';
 import { DiskSafetyGuideTab } from '../components/disk/DiskSafetyGuideTab';
+import { DiskSmartSection } from '../components/files/DiskSmartSection';
 import { useTranslation } from 'react-i18next';
 
 export function DiskAnalyzer() {
@@ -36,7 +38,7 @@ export function DiskAnalyzer() {
 
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [storages, setStorages] = useState<MountItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'ncdu' | 'insights' | 'safety'>('ncdu');
+  const [activeTab, setActiveTab] = useState<'ncdu' | 'insights' | 'safety' | 'smart'>('ncdu');
 
   // Search and Sort states
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -292,6 +294,17 @@ export function DiskAnalyzer() {
             <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
             <span>{t('disk.do_not_touch', 'O que NÃO Mexer')}</span>
           </button>
+          <button
+            onClick={() => setActiveTab('smart')}
+            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'smart'
+                ? 'bg-saturn-500 text-white shadow-md shadow-saturn-500/25'
+                : 'text-secondary hover:text-primary hover:bg-accent'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            <span>{t('disk.smart_tab', 'Saúde & S.M.A.R.T.')}</span>
+          </button>
         </div>
       </div>
 
@@ -303,7 +316,8 @@ export function DiskAnalyzer() {
       />
 
       {/* DIRECT PATH INPUT & QUICK PRESET CHIPS */}
-      <div className="bg-card/85 backdrop-blur-2xl border border-border/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-sm">
+      {activeTab !== 'smart' && (
+        <div className="bg-card/85 backdrop-blur-2xl border border-border/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-sm">
         <form onSubmit={handleCustomPathSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="relative flex-1">
             <FolderSearch className="w-4 h-4 text-secondary absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -346,6 +360,7 @@ export function DiskAnalyzer() {
           ))}
         </div>
       </div>
+      )}
 
       {/* TAB 1: DIRECTORY TREE & TOP CONSUMERS */}
       {activeTab === 'ncdu' && (
@@ -393,6 +408,9 @@ export function DiskAnalyzer() {
 
       {/* TAB 3: FILESYSTEM SAFETY GUIDE */}
       {activeTab === 'safety' && <DiskSafetyGuideTab />}
+
+      {/* TAB 4: S.M.A.R.T. PHYSICAL HEALTH */}
+      {activeTab === 'smart' && <DiskSmartSection />}
     </div>
   );
 }

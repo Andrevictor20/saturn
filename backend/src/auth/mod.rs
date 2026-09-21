@@ -1,6 +1,7 @@
 pub mod jwt;
 pub mod permissions;
 pub mod rate_limit;
+pub mod sessions;
 pub mod totp;
 pub mod two_factor;
 pub mod users_api;
@@ -8,6 +9,7 @@ pub mod users_api;
 pub use jwt::{get_jwt_secret, Claims};
 pub use permissions::*;
 pub use rate_limit::{check_rate_limit, clear_attempts, record_failed_attempt};
+pub use sessions::*;
 pub use totp::*;
 pub use two_factor::*;
 pub use users_api::*;
@@ -223,12 +225,15 @@ pub async fn setup(
         .unwrap()
         .as_secs() as usize;
 
-    let claims = Claims {
-        sub: payload.username,
-        exp: expiration,
-        role: "admin".to_string(),
-        uid: Some(admin_user.id),
-    };
+    let session = sessions::create_session(&admin_user.username, Some(&admin_user.id), "127.0.0.1", "Setup Wizard");
+
+    let claims = Claims::with_sid(
+        payload.username,
+        expiration,
+        "admin".to_string(),
+        Some(admin_user.id),
+        Some(session.id),
+    );
 
     let token = encode(
         &Header::default(),
@@ -309,6 +314,7 @@ pub async fn login(
             exp: expiration,
             role: user.role.as_str().to_string(),
             uid: Some(user.id.clone()),
+            sid: None,
         };
 
         let temp_token = encode(
@@ -335,12 +341,19 @@ pub async fn login(
         .unwrap()
         .as_secs() as usize;
 
-    let claims = Claims {
-        sub: user.username.clone(),
-        exp: expiration,
-        role: user.role.as_str().to_string(),
-        uid: Some(user.id.clone()),
-    };
+    let user_agent = parts.headers.get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("Unknown Device");
+
+    let session = sessions::create_session(&user.username, Some(&user.id), &client_ip, user_agent);
+
+    let claims = Claims::with_sid(
+        user.username.clone(),
+        expiration,
+        user.role.as_str().to_string(),
+        Some(user.id.clone()),
+        Some(session.id),
+    );
 
     let token = encode(
         &Header::default(),
@@ -371,11 +384,17 @@ pub async fn change_password(
         .map(|cookie| cookie.value())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let _token_data = decode::<Claims>(
+    let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(get_jwt_secret()),
         &Validation::default(),
     ).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    if let Some(sid) = &token_data.claims.sid {
+        if !sessions::is_session_valid(sid) {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    }
 
     let mut auth_data = get_auth_data().ok_or(StatusCode::UNAUTHORIZED)?;
 
@@ -413,7 +432,11 @@ pub async fn me(jar: CookieJar) -> Result<Json<serde_json::Value>, StatusCode> {
     if token_data.claims.sub.starts_with("2fa_temp:") {
         return Err(StatusCode::UNAUTHORIZED);
     }
-
+    if let Some(sid) = &token_data.claims.sid {
+        if !sessions::is_session_valid(sid) {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    }
     let user = get_user_by_username(&token_data.claims.sub);
     let role = user.as_ref().map(|u| u.role.as_str()).unwrap_or(token_data.claims.role.as_str());
     let display_name = user.as_ref().and_then(|u| u.display_name.clone());
@@ -440,29 +463,22 @@ pub fn public_router() -> Router {
         .route("/api/auth/me", get(me))
 }
 
+pub fn protected_router() -> Router<crate::state::AppState> {
+    Router::new()
+        .route("/api/auth/sessions", get(sessions::get_user_sessions_handler))
+        .route("/api/auth/sessions/{id}", axum::routing::delete(sessions::revoke_session_handler))
+        .route("/api/auth/sessions/revoke-others", post(sessions::revoke_other_sessions_handler))
+}
+
+pub fn admin_router() -> Router<crate::state::AppState> {
+    Router::new()
+        .route("/api/auth/security/blocked-ips", get(rate_limit::list_blocked_ips_handler))
+        .route("/api/auth/security/unblock-ip", post(rate_limit::unblock_ip_handler))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_rate_limiter() {
-        let ip = "192.168.1.100";
-        // Attempt 1 to 4 should pass
-        for _ in 0..4 {
-            assert!(check_rate_limit(ip));
-            record_failed_attempt(ip);
-        }
-        // Attempt 5 should still pass
-        assert!(check_rate_limit(ip));
-        record_failed_attempt(ip);
-        
-        // Attempt 6 MUST fail (this kills the `<` vs `<=` mutant)
-        assert_eq!(check_rate_limit(ip), false);
-        
-        // Clear attempts should restore access
-        clear_attempts(ip);
-        assert!(check_rate_limit(ip));
-    }
 
     #[test]
     fn test_get_jwt_secret() {

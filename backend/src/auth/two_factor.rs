@@ -171,7 +171,14 @@ pub async fn two_factor_login(
         ("admin".to_string(), None)
     };
 
-    let claims = Claims::new(auth_data.username, expiration, role, uid);
+    let user_agent = parts
+        .headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("Unknown Device");
+
+    let session = super::sessions::create_session(&auth_data.username, uid.as_deref(), &client_ip, user_agent);
+    let claims = Claims::with_sid(auth_data.username, expiration, role, uid, Some(session.id));
 
     let token = encode(
         &Header::default(),

@@ -19,6 +19,7 @@ fn get_valid_token() -> String {
         exp: 10000000000,
         role: "admin".to_string(),
         uid: None,
+        sid: None,
     };
     encode(
         &Header::default(),

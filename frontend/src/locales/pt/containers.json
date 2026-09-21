@@ -107,5 +107,9 @@
   "var_remove_aria": "Remover variável {{index}}",
   "host_path_aria": "Host path {{index}}",
   "container_path_aria": "Container path {{index}}",
-  "volume_remove_aria": "Remover volume {{index}}"
+  "volume_remove_aria": "Remover volume {{index}}",
+  "watchtower_check": "Varredura Watchtower",
+  "watchtower_check_title": "Verificar atualizações no Docker Registry via Watchtower",
+  "watchtower_check_complete": "Varredura Watchtower concluída!",
+  "watchtower_check_failed": "Erro ao verificar atualizações de contêineres"
 }

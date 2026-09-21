@@ -9,6 +9,8 @@ pub struct Claims {
     pub role: String,
     #[serde(default)]
     pub uid: Option<String>,
+    #[serde(default)]
+    pub sid: Option<String>,
 }
 
 fn default_role() -> String {
@@ -22,6 +24,17 @@ impl Claims {
             exp,
             role: role.into(),
             uid,
+            sid: None,
+        }
+    }
+
+    pub fn with_sid(sub: impl Into<String>, exp: usize, role: impl Into<String>, uid: Option<String>, sid: Option<String>) -> Self {
+        Self {
+            sub: sub.into(),
+            exp,
+            role: role.into(),
+            uid,
+            sid,
         }
     }
 
@@ -31,6 +44,7 @@ impl Claims {
             exp,
             role: "admin".to_string(),
             uid: None,
+            sid: None,
         }
     }
 }

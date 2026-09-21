@@ -1,9 +1,11 @@
 pub mod alerts;
 pub mod collector;
+pub mod docker_events;
 pub mod models;
 
 pub use alerts::*;
 pub use collector::*;
+pub use docker_events::*;
 pub use models::*;
 pub use crate::system::network::*;
 
@@ -37,9 +39,11 @@ pub fn ensure_stats_collector(docker: Arc<Docker>) {
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()
     {
+        let docker_events = docker.clone();
         tokio::spawn(async move {
             run_singleton_stats_collector(docker).await;
         });
+        start_docker_events_listener(docker_events);
     }
 }
 

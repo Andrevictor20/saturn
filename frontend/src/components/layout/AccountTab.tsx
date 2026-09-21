@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { UserAvatar } from '../ui/UserAvatar';
 import { TwoFactorSetupModal } from '../auth/TwoFactorSetupModal';
 import { TwoFactorDisableModal } from '../auth/TwoFactorDisableModal';
+import { ActiveSessionsSection } from '../auth/ActiveSessionsSection';
 
 export function AccountTab() {
   const { t } = useTranslation();
@@ -203,6 +204,9 @@ export function AccountTab() {
           <span>{t('profile.change_password', 'Alterar Senha')}</span>
         </button>
       </form>
+
+      {/* Active Sessions & Devices */}
+      <ActiveSessionsSection />
 
       {/* Modals */}
       <TwoFactorSetupModal

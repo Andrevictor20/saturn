@@ -12,6 +12,7 @@ fn valid_auth_cookie() -> String {
         exp: 10_000_000_000,
         role: "admin".to_string(),
         uid: None,
+        sid: None,
     };
     let token = encode(
         &Header::default(),

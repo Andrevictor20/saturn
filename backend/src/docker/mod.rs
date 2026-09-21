@@ -12,8 +12,10 @@ pub mod parser;
 pub mod ports;
 pub mod compose;
 pub mod backups;
+pub mod watchtower;
 
 pub mod visibility;
+pub mod daemon_optimizer;
 
 pub use types::*;
 pub use stats::*;
@@ -26,7 +28,9 @@ pub use parser::*;
 pub use ports::*;
 pub use compose::*;
 pub use backups::*;
+pub use watchtower::*;
 pub use visibility::*;
+pub use daemon_optimizer::*;
 pub use crate::state::AppState;
 
 use axum::{
@@ -67,6 +71,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/docker/containers/{id}/update-status", get(get_container_update_status))
         .route("/api/docker/containers/{id}/check-update", get(check_single_container_update))
         .route("/api/docker/containers/check-updates", get(check_container_updates))
+        .route("/api/docker/updates/summary", get(get_watchtower_summary_handler))
+        .route("/api/docker/updates/check-now", post(trigger_watchtower_check_handler))
         .route("/api/docker/containers/{id}/exec", get(container_exec_ws))
         .route("/api/docker/containers/{id}/{action}", post(container_action))
         .route("/api/docker/containers/stats/snapshot", get(snapshot_stats))

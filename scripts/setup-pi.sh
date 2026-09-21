@@ -30,7 +30,7 @@ if command -v sudo &>/dev/null; then
   # Limit Docker Daemon json-file logs globally
   if [ ! -f /etc/docker/daemon.json ]; then
     sudo mkdir -p /etc/docker
-    echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}' | sudo tee /etc/docker/daemon.json > /dev/null
+    echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"},"max-concurrent-downloads":10,"max-concurrent-uploads":5,"max-download-attempts":5}' | sudo tee /etc/docker/daemon.json > /dev/null
     sudo systemctl restart docker || true
   fi
 

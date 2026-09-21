@@ -48,7 +48,9 @@ pub async fn try_compose_update(
         .arg(&compose_file_path)
         .arg("--project-directory")
         .arg(&project_dir)
-        .arg("pull");
+        .arg("pull")
+        .env("DOCKER_BUILDKIT", "1")
+        .env("COMPOSE_PARALLEL_LIMIT", "8");
     if let Some(svc) = compose_service {
         pull_cmd.arg(svc);
     }

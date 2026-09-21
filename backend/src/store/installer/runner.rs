@@ -160,6 +160,8 @@ pub fn spawn_compose_installation_with_env(
         let mut pull_cmd = Command::new("docker")
             .arg("compose")
             .arg("pull")
+            .env("DOCKER_BUILDKIT", "1")
+            .env("COMPOSE_PARALLEL_LIMIT", "8")
             .current_dir(&app_dir)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped())

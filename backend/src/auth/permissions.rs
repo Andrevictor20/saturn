@@ -158,6 +158,14 @@ pub async fn require_auth(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
+    // Validate active session if sid is present in token claims
+    if let Some(ref sid) = token_data.claims.sid {
+        if !super::sessions::is_session_valid(sid) {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+        super::sessions::touch_session(sid);
+    }
+
     req.extensions_mut().insert(token_data.claims);
     Ok(next.run(req).await)
 }

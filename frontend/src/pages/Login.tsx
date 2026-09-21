@@ -141,12 +141,14 @@ export function Login() {
         </div>
       )}
 
-      {/* Ambient Lighting & Glow Orbs (Subtle when wallpaper is active to preserve true colors) */}
-      <div className={`fixed inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-500 ${wallpaperUrl ? 'opacity-25' : 'opacity-80'}`}>
-        <div className="absolute -top-36 -right-32 w-[650px] h-[650px] rounded-full bg-gradient-to-br from-saturn-500/20 via-purple-600/12 to-transparent blur-[140px] opacity-80 animate-float-slow" />
-        <div className="absolute top-1/4 -left-48 w-[720px] h-[720px] rounded-full bg-gradient-to-tr from-saturn-600/16 via-cyan-500/10 to-transparent blur-[150px] opacity-75 animate-float-reverse" />
-        <div className="absolute -bottom-40 right-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tl from-indigo-500/16 via-pink-500/10 to-transparent blur-[140px] opacity-70 animate-pulse-glow" />
-      </div>
+      {/* Ambient Lighting & Glow Orbs (Active only without wallpaper to preserve authentic photo colors) */}
+      {!wallpaperUrl && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-500 opacity-80">
+          <div className="absolute -top-36 -right-32 w-[650px] h-[650px] rounded-full bg-gradient-to-br from-saturn-500/20 via-purple-600/12 to-transparent blur-[140px] opacity-80 animate-float-slow" />
+          <div className="absolute top-1/4 -left-48 w-[720px] h-[720px] rounded-full bg-gradient-to-tr from-saturn-600/16 via-cyan-500/10 to-transparent blur-[150px] opacity-75 animate-float-reverse" />
+          <div className="absolute -bottom-40 right-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tl from-indigo-500/16 via-pink-500/10 to-transparent blur-[140px] opacity-70 animate-pulse-glow" />
+        </div>
+      )}
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 animate-fade-in">
         <div className="flex justify-center">

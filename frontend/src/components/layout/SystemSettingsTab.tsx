@@ -16,6 +16,7 @@ import {
 import toast from 'react-hot-toast';
 import { useSettings } from '../../contexts/SettingsContext';
 import type { PortConflictInfo } from '../../types/settings';
+import { BlockedIpsSection } from './BlockedIpsSection';
 
 export function SystemSettingsTab() {
   const { t } = useTranslation();
@@ -343,6 +344,9 @@ export function SystemSettingsTab() {
           <span>{t('settings.save_settings', 'Salvar Configurações')}</span>
         </button>
       </div>
+
+      {/* Proteção Anti-Brute Force (Fail2Ban) */}
+      <BlockedIpsSection />
     </form>
   );
 }

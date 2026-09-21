@@ -18,6 +18,7 @@ fn get_test_token() -> String {
         exp: expiration,
         role: "admin".to_string(),
         uid: None,
+        sid: None,
     };
     
     encode(

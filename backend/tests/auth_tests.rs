@@ -94,7 +94,36 @@ async fn test_auth_flow() {
         .await;
     login_new.assert_status_success();
 
+    // 11. Test listing active sessions
+    let sessions_res = server.get("/api/auth/sessions")
+        .add_cookie(login_new.cookie("auth_token").clone())
+        .await;
+    sessions_res.assert_status_success();
+    let sessions_list: Vec<serde_json::Value> = sessions_res.json();
+    assert!(!sessions_list.is_empty(), "Should have at least 1 active session");
+    let current_session_id = sessions_list[0]["id"].as_str().unwrap().to_string();
+
+    // 12. Test blocked IPs listing (Admin only)
+    let blocked_ips_res = server.get("/api/auth/security/blocked-ips")
+        .add_cookie(login_new.cookie("auth_token").clone())
+        .await;
+    blocked_ips_res.assert_status_success();
+
+    // 13. Test session revocation
+    let revoke_res = server.delete(&format!("/api/auth/sessions/{}", current_session_id))
+        .add_cookie(login_new.cookie("auth_token").clone())
+        .await;
+    revoke_res.assert_status_success();
+
+    // 14. Subsequent request with the revoked token MUST fail with 401 Unauthorized
+    let post_revoke_me = server.get("/api/auth/me")
+        .add_cookie(login_new.cookie("auth_token").clone())
+        .await;
+    post_revoke_me.assert_status_unauthorized();
+
     // Clean up
     let _ = fs::remove_file("data/saturn_auth.json");
     let _ = fs::remove_file("data/saturn_users.json");
+    let _ = fs::remove_file("data/sessions.json");
+    let _ = fs::remove_file("data/blocked_ips.json");
 }

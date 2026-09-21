@@ -1,6 +1,6 @@
 [package]
 name = "backend"
-version = "3.9.1"
+version = "4.0.0"
 edition = "2021"
 
 [dependencies]
@@ -25,7 +25,7 @@ subtle = "2.6.1"
 sysinfo = "0.39.6"
 time = "0.3.55"
 tokio = { version = "1.53.1", features = ["full"] }
-tower-http = { version = "0.7.0", features = ["set-header", "cors", "fs"] }
+tower-http = { version = "0.7.0", features = ["set-header", "cors", "fs", "compression-full"] }
 uuid = { version = "1.24.1", features = ["v4"] }
 zip = "8.6.0"
 tracing = "0.1.41"

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { cleanAppName, type GroupContainerItem, type ContainerLike } from '../../utils/containerGroups';
+import { type GroupContainerItem, type ContainerLike } from '../../utils/containerGroups';
 import { AppGroupModal } from './AppGroupModal';
 import { DockerInstallModal } from './DockerInstallModal';
 import { BatchUpdateModal } from './BatchUpdateModal';
@@ -19,6 +19,7 @@ import {
   useFilteredContainers,
   useContainerCustomLinks,
   useContainerVisibility,
+  useCloudflareRoutes,
 } from './container-list';
 import { CONTAINERS_QUERY_KEY } from '../../queries';
 import { queryClient } from '../../lib/queryClient';
@@ -45,20 +46,15 @@ export function ContainerList() {
   const [updatesMap, setUpdatesMap] = useState<Record<string, { has_update: boolean }>>({});
   const { isModalOpen, openModal, closeModal } = useBatchUpdate();
   const [customLinks, setCustomLinks] = useState<Record<string, string>>({});
-  const [cloudflareRoutes, setCloudflareRoutes] = useState<Array<{
-    hostname: string;
-    service: string;
-    public_url: string;
-    matched_container_id?: string;
-    matched_container_name?: string;
-  }>>([]);
   const [isDockerInstallOpen, setIsDockerInstallOpen] = useState(false);
+  const [watchtowerChecking, setWatchtowerChecking] = useState(false);
   
   // New filtering and sorting states
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'cpu' | 'ram' | 'disk'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const { isAdmin, isContainerHidden, toggleVisibility } = useContainerVisibility();
+  const { cloudflareRoutes, fetchCloudflareRoutes } = useCloudflareRoutes(isAdmin, setCustomLinks);
   const handleToggleVisibility = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     toggleVisibility(id);
@@ -143,94 +139,21 @@ export function ContainerList() {
     }
   };
 
-  const fetchCloudflareRoutes = async () => {
-    if (!isAdmin) return;
+  const handleWatchtowerCheckNow = async () => {
+    setWatchtowerChecking(true);
     try {
-      const res = await fetch('/api/cloudflare/tunnels', {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('saturn_token') : null;
+      await fetch('/api/docker/updates/check-now', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
       });
-      if (res.ok) {
-        const data = await res.json();
-        const rules = data.rules || [];
-        setCloudflareRoutes(rules);
-
-        if (!localStorage.getItem('saturn_base_domain') && rules.length > 0) {
-          for (const r of rules) {
-            if (r.hostname && r.hostname.includes('.')) {
-              const parts = r.hostname.split('.');
-              if (parts.length >= 2) {
-                localStorage.setItem('saturn_base_domain', parts.slice(1).join('.'));
-                break;
-              }
-            }
-          }
-        }
-
-        if (rules.length > 0) {
-          setCustomLinks(prev => {
-            const next = { ...prev };
-            let changed = false;
-
-            const setLink = (k: string, v: string) => {
-              if (k && !next[k]) {
-                next[k] = v;
-                changed = true;
-              }
-            };
-
-            for (const r of rules) {
-              const url = r.public_url || (r.hostname ? `https://${r.hostname}` : '');
-              if (!url) continue;
-
-              if (r.matched_container_id) {
-                setLink(r.matched_container_id, url);
-                if (r.matched_container_id.length >= 12) {
-                  setLink(r.matched_container_id.substring(0, 12), url);
-                }
-              }
-
-              if (r.matched_container_name) {
-                const name = r.matched_container_name.replace(/^\//, '');
-                setLink(name, url);
-                setLink(name.toLowerCase(), url);
-
-                const cleaned = cleanAppName(name);
-                if (cleaned && cleaned.length >= 3) {
-                  setLink(cleaned, url);
-                }
-
-                const tokens = name.toLowerCase().split(/[-_]+/).filter((t: string) => t.length >= 3);
-                for (const t of tokens) {
-                  setLink(t, url);
-                }
-              }
-
-              if (r.hostname && r.hostname.includes('.')) {
-                const parts = r.hostname.toLowerCase().split('.');
-                const sub = parts[0];
-                const genericSubs = ['www', 'app', 'web', 'api', 'dashboard', 'saturn', 'proxy'];
-                if (sub && sub.length >= 3 && !genericSubs.includes(sub)) {
-                  setLink(sub, url);
-                }
-              }
-
-              if (r.service && (r.service.startsWith('http://') || r.service.startsWith('https://'))) {
-                try {
-                  const parsed = new URL(r.service);
-                  const host = parsed.hostname;
-                  if (host && host !== 'localhost' && !/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
-                    setLink(host, url);
-                    setLink(host.toLowerCase(), url);
-                  }
-                } catch {}
-              }
-            }
-            return changed ? next : prev;
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to fetch cloudflare tunnels', err);
+      await fetchUpdates();
+      toast.success(t('containers.watchtower_check_complete', 'Varredura Watchtower concluída!'));
+    } catch {
+      toast.error(t('containers.watchtower_check_failed', 'Erro ao verificar atualizações'));
+    } finally {
+      setWatchtowerChecking(false);
     }
   };
 
@@ -367,6 +290,8 @@ export function ContainerList() {
         onSortByChange={setSortBy}
         sortOrder={sortOrder}
         onToggleSortOrder={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+        watchtowerChecking={watchtowerChecking}
+        onWatchtowerCheckNow={handleWatchtowerCheckNow}
       />
 
       {loading && containers.length === 0 && (

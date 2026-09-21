@@ -697,41 +697,41 @@
 
   /* ================== CORES DO WALLPAPER (ADAPTIVE THEME) ================== */
   .theme-wallpaper {
-    --bg: #ffffff;
-    --card: rgba(255, 255, 255, 0.75);
-    --card-hover: rgba(244, 244, 245, 0.9);
-    --border: rgba(0, 0, 0, 0.12);
+    --bg: #f8fafc;
+    --card: rgba(255, 255, 255, 0.90);
+    --card-hover: rgba(248, 250, 252, 0.96);
+    --border: rgba(0, 0, 0, 0.10);
     --primary: #09090b;
     --secondary: #52525b;
-    --muted: rgba(244, 244, 245, 0.85);
-    --accent: rgba(0, 0, 0, 0.06);
+    --muted: rgba(241, 245, 249, 0.90);
+    --accent: rgba(0, 0, 0, 0.04);
 
     --saturn-500: #6366f1;
     --saturn-600: #4f46e5;
 
-    --glass-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 0 15px 0 rgba(0, 0, 0, 0.03), 0 12px 36px -6px rgba(0, 0, 0, 0.08);
-    --glass-pill-bg: rgba(0, 0, 0, 0.05);
-    --glass-pill-border: rgba(0, 0, 0, 0.15);
+    --glass-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95), 0 10px 30px -8px rgba(0, 0, 0, 0.06);
+    --glass-pill-bg: rgba(0, 0, 0, 0.04);
+    --glass-pill-border: rgba(0, 0, 0, 0.12);
     --glass-pill-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.85);
   }
 
   .dark.theme-wallpaper {
     --bg: #090a0f;
-    --card: rgba(14, 16, 24, 0.78);
-    --card-hover: rgba(22, 25, 38, 0.88);
+    --card: rgba(13, 15, 24, 0.88);
+    --card-hover: rgba(20, 24, 38, 0.94);
     --border: rgba(255, 255, 255, 0.12);
     --primary: #f4f4f5;
     --secondary: #94a3b8;
-    --muted: rgba(30, 35, 50, 0.85);
-    --accent: rgba(255, 255, 255, 0.10);
+    --muted: rgba(28, 32, 48, 0.85);
+    --accent: rgba(255, 255, 255, 0.06);
 
     --saturn-500: #818cf8;
     --saturn-600: #6366f1;
 
-    --glass-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px 0 rgba(255, 255, 255, 0.03), 0 20px 50px -10px rgba(0, 0, 0, 0.95);
-    --glass-pill-bg: rgba(255, 255, 255, 0.08);
-    --glass-pill-border: rgba(255, 255, 255, 0.25);
-    --glass-pill-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+    --glass-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.15), 0 16px 40px -10px rgba(0, 0, 0, 0.65);
+    --glass-pill-bg: rgba(255, 255, 255, 0.06);
+    --glass-pill-border: rgba(255, 255, 255, 0.18);
+    --glass-pill-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
   }
 
   /* ================== SYNTHWAVE ================== */

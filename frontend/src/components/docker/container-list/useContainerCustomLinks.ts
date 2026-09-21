@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Container } from './types';
 
-interface CloudflareRouteItem {
+export interface CloudflareRouteItem {
   hostname: string;
   service: string;
   public_url: string;

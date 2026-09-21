@@ -18,6 +18,7 @@ fn get_test_cookie() -> axum_extra::extract::cookie::Cookie<'static> {
         exp: expiration,
         role: "admin".to_string(),
         uid: None,
+        sid: None,
     };
     
     let token = encode(

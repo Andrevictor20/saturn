@@ -5,6 +5,7 @@ pub mod gpu;
 pub mod network;
 pub mod processes;
 pub mod settings;
+pub mod smart;
 pub mod update;
 pub mod weather;
 
@@ -30,6 +31,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/system/alerts", axum::routing::get(alerts::get_alerts_handler))
         .route("/api/system/gpu", axum::routing::get(gpu::get_gpu_handler))
         .route("/api/system/weather", axum::routing::get(weather::get_weather_handler))
+        .route("/api/system/disks/smart", axum::routing::get(smart::get_disks_smart_handler))
         .route("/api/system/settings", axum::routing::get(settings::get_settings_handler))
         .route("/api/system/customization", axum::routing::get(customization::get_customization_handler))
         .merge(admin_routes)

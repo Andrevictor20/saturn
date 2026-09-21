@@ -113,9 +113,13 @@ export function ThemeProvider({
     const root = window.document.documentElement;
 
     if (color !== 'wallpaper') {
+      root.style.removeProperty('--saturn-400');
       root.style.removeProperty('--saturn-500');
       root.style.removeProperty('--saturn-600');
+      root.style.removeProperty('--saturn-contrast');
+      root.style.removeProperty('--color-saturn-400');
       root.style.removeProperty('--color-saturn-500');
+      root.style.removeProperty('--color-saturn-600');
       root.style.removeProperty('--accent');
       root.style.removeProperty('--glass-shadow');
       return;
@@ -125,25 +129,27 @@ export function ThemeProvider({
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
       : theme === 'dark';
 
+    const applyPalette = (pal: WallpaperThemePalette) => {
+      setWallpaperPalette(pal);
+      root.style.setProperty('--saturn-400', pal.primary);
+      root.style.setProperty('--saturn-500', pal.primary);
+      root.style.setProperty('--saturn-600', pal.primaryHover);
+      root.style.setProperty('--saturn-contrast', pal.contrastText);
+      root.style.setProperty('--color-saturn-400', pal.primary);
+      root.style.setProperty('--color-saturn-500', pal.primary);
+      root.style.setProperty('--color-saturn-600', pal.primaryHover);
+      root.style.setProperty('--accent', pal.accent);
+      root.style.setProperty('--glass-shadow', pal.glassShadow);
+    };
+
     if (!wallpaperUrl) {
-      const def = DEFAULT_WALLPAPER_PALETTE;
-      setWallpaperPalette(def);
-      root.style.setProperty('--saturn-500', def.primary);
-      root.style.setProperty('--saturn-600', def.primaryHover);
-      root.style.setProperty('--color-saturn-500', def.primary);
-      root.style.setProperty('--accent', def.accent);
-      root.style.setProperty('--glass-shadow', def.glassShadow);
+      applyPalette(DEFAULT_WALLPAPER_PALETTE);
       return;
     }
 
     extractPaletteFromImage(wallpaperUrl, isDark).then((pal) => {
       if (!active) return;
-      setWallpaperPalette(pal);
-      root.style.setProperty('--saturn-500', pal.primary);
-      root.style.setProperty('--saturn-600', pal.primaryHover);
-      root.style.setProperty('--color-saturn-500', pal.primary);
-      root.style.setProperty('--accent', pal.accent);
-      root.style.setProperty('--glass-shadow', pal.glassShadow);
+      applyPalette(pal);
     });
 
     return () => {

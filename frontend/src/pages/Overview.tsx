@@ -43,6 +43,12 @@ export function Overview() {
   useEffect(() => {
     fetchContainers();
     fetchLinks();
+
+    const onDockerEvent = () => {
+      fetchContainers();
+    };
+    window.addEventListener('saturn:docker-event', onDockerEvent);
+    return () => window.removeEventListener('saturn:docker-event', onDockerEvent);
   }, []);
 
   const groupedItems = useMemo(() => groupContainers(containers, customLinks, getIconForImage), [containers, customLinks]);

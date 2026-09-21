@@ -57,7 +57,11 @@ export function useWebSocket(path: string) {
     ws.onmessage = (event) => {
       if (!mountedRef.current) return;
       try {
-        const data: SystemStats = JSON.parse(event.data);
+        const data = JSON.parse(event.data);
+        if (data && data.event_type === 'docker_event') {
+          window.dispatchEvent(new CustomEvent('saturn:docker-event', { detail: data }));
+          return;
+        }
         setStats(data);
       } catch {
         // Ignore malformed messages

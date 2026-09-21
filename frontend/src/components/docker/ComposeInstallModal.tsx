@@ -8,13 +8,15 @@ import {
   Play, 
   Plus, 
   Download, 
-  Loader2 
+  Loader2,
+  Wand2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { COMPOSE_TEMPLATES } from '../compose/composeTemplates';
 import { extractPortsFromYaml, validateComposeSyntax } from '../compose/yamlValidator';
 import { DockerRunTab } from './DockerRunTab';
 import { ComposeEditorTab, type StackOption } from './ComposeEditorTab';
+import { ComposeWizardTab } from './ComposeWizardTab';
 import { useInstall } from '../../contexts/InstallContext';
 
 export interface ComposeInstallModalProps {
@@ -36,7 +38,7 @@ export function ComposeInstallModal({
 }: ComposeInstallModalProps) {
   const { t } = useTranslation();
   const { startInstall } = useInstall();
-  const [modalTab, setModalTab] = useState<'compose' | 'dockerrun'>('compose');
+  const [modalTab, setModalTab] = useState<'wizard' | 'compose' | 'dockerrun'>('compose');
   const [stackName, setStackName] = useState('');
   const [composeYaml, setComposeYaml] = useState(COMPOSE_TEMPLATES[0]?.yaml || '');
   const [envContent, setEnvContent] = useState(COMPOSE_TEMPLATES[0]?.env || '');
@@ -200,15 +202,10 @@ export function ComposeInstallModal({
     }
   };
 
-  const handleDeploy = async () => {
-    const cleanName = stackName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const handleDeployWith = async (yamlToDeploy: string, nameToDeploy: string) => {
+    const cleanName = nameToDeploy.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
     if (!cleanName) {
       toast.error(t('compose_modal.name_required', 'Informe um nome válido para a stack'));
-      return;
-    }
-
-    if (!validation.valid) {
-      toast.error(t('docker.fix_yaml_errors', { error: validation.error, defaultValue: `Corrija os erros do YAML: ${validation.error}` }));
       return;
     }
 
@@ -222,7 +219,7 @@ export function ComposeInstallModal({
         credentials: 'include',
         body: JSON.stringify({
           name: cleanName,
-          compose_yaml: composeYaml,
+          compose_yaml: yamlToDeploy,
           env_content: envContent.trim() ? envContent : null,
         }),
       });
@@ -233,7 +230,7 @@ export function ComposeInstallModal({
         credentials: 'include',
         body: JSON.stringify({
           app_name: cleanName,
-          compose_yaml: composeYaml,
+          compose_yaml: yamlToDeploy,
           override_ports: {}
         }),
       });
@@ -257,6 +254,14 @@ export function ComposeInstallModal({
     } finally {
       setDeploying(false);
     }
+  };
+
+  const handleDeploy = () => {
+    if (!validation.valid) {
+      toast.error(t('docker.fix_yaml_errors', { error: validation.error, defaultValue: `Corrija os erros do YAML: ${validation.error}` }));
+      return;
+    }
+    handleDeployWith(composeYaml, stackName);
   };
 
   const handleDownload = () => {
@@ -315,6 +320,19 @@ export function ComposeInstallModal({
         <div className="flex border-b border-border px-6 gap-3 bg-muted/10 text-xs font-semibold">
           <button
             type="button"
+            onClick={() => setModalTab('wizard')}
+            className={`py-3 flex items-center gap-2 border-b-2 transition-all ${
+              modalTab === 'wizard'
+                ? 'border-saturn-500 text-saturn-500 font-bold'
+                : 'border-transparent text-secondary hover:text-primary'
+            }`}
+          >
+            <Wand2 className="w-4 h-4" />
+            <span>{t('compose_modal.tab_wizard', 'Assistente Visual')}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setModalTab('compose')}
             className={`py-3 flex items-center gap-2 border-b-2 transition-all ${
               modalTab === 'compose'
@@ -342,7 +360,18 @@ export function ComposeInstallModal({
 
         {/* Body Area */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {modalTab === 'dockerrun' ? (
+          {modalTab === 'wizard' ? (
+            <ComposeWizardTab
+              onTransferToEditor={(yamlStr, name) => {
+                setComposeYaml(yamlStr);
+                if (name) setStackName(name);
+                setModalTab('compose');
+                toast.success('Configuração gerada e carregada no Editor Compose!');
+              }}
+              onDeployDirect={handleDeployWith}
+              isDeploying={deploying}
+            />
+          ) : modalTab === 'dockerrun' ? (
             <DockerRunTab
               onTransferToEditor={(yamlStr, name) => {
                 setComposeYaml(yamlStr);

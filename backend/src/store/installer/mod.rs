@@ -180,6 +180,8 @@ pub async fn update_app(Path(id): Path<String>) -> impl IntoResponse {
         let pull_spawn = Command::new("docker")
             .arg("compose")
             .arg("pull")
+            .env("DOCKER_BUILDKIT", "1")
+            .env("COMPOSE_PARALLEL_LIMIT", "8")
             .current_dir(&app_dir)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped())

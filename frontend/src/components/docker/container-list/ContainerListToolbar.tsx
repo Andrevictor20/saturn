@@ -26,6 +26,8 @@ interface ContainerListToolbarProps {
   onSortByChange: (sort: 'name' | 'cpu' | 'ram' | 'disk') => void;
   sortOrder: 'asc' | 'desc';
   onToggleSortOrder: () => void;
+  watchtowerChecking?: boolean;
+  onWatchtowerCheckNow?: () => void;
 }
 
 export function ContainerListToolbar({
@@ -46,6 +48,8 @@ export function ContainerListToolbar({
   onSortByChange,
   sortOrder,
   onToggleSortOrder,
+  watchtowerChecking = false,
+  onWatchtowerCheckNow,
 }: ContainerListToolbarProps) {
   const { t } = useTranslation();
 
@@ -117,6 +121,19 @@ export function ContainerListToolbar({
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             {t('common.refresh')}
           </button>
+
+          {onWatchtowerCheckNow && (
+            <button
+              type="button"
+              onClick={onWatchtowerCheckNow}
+              disabled={watchtowerChecking}
+              className="px-3 py-2 bg-card hover:bg-accent text-slate-700 dark:text-secondary hover:text-primary rounded-md flex items-center gap-1.5 transition-colors text-xs sm:text-sm font-medium border border-border disabled:opacity-50"
+              title={t('containers.watchtower_check_title', 'Verificar atualizações no Docker Registry via Watchtower')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-saturn-500 ${watchtowerChecking ? 'animate-spin' : ''}`} />
+              <span className="hidden lg:inline">{t('containers.watchtower_check', 'Varredura Watchtower')}</span>
+            </button>
+          )}
 
           <button
             onClick={onOpenDockerInstall}

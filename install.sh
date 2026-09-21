@@ -147,7 +147,7 @@ apply_storage_policy() {
   log_info "Aplicando configurações de proteção contra esgotamento de disco..."
   if [ ! -f /etc/docker/daemon.json ]; then
     $SUDO mkdir -p /etc/docker
-    echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}' | $SUDO tee /etc/docker/daemon.json > /dev/null
+    echo '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"},"max-concurrent-downloads":10,"max-concurrent-uploads":5,"max-download-attempts":5}' | $SUDO tee /etc/docker/daemon.json > /dev/null
     $SUDO systemctl restart docker 2>/dev/null || true
   fi
 

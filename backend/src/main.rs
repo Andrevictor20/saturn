@@ -73,6 +73,9 @@ async fn main() {
     // Auto-heal and restore persistent configuration files from legacy/previous volumes if needed
     backend::system::data_migrator::auto_heal_persistent_data();
 
+    // Optimize Docker daemon for high-speed concurrent layer downloads if needed
+    backend::docker::ensure_docker_daemon_optimized();
+
     // Load App Store cache from disk or sync in background
     tokio::spawn(async {
         if !backend::store::catalog::load_cached_apps_from_disk() {

@@ -23,6 +23,7 @@ use axum::{
 };
 use bollard::Docker;
 use std::sync::Arc;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -58,6 +59,9 @@ pub fn app() -> Router {
         system::cleanup_old_saturn_images(docker_cleanup).await;
     });
 
+    // Background Watchtower update checker loop
+    docker::watchtower::start_watchtower_loop(state.docker.clone());
+
     // Background auto-sync of Cloudflare tunnel links to containers on startup and periodically
     let docker_cf = state.docker.clone();
     tokio::spawn(async move {
@@ -79,6 +83,7 @@ pub fn app() -> Router {
         .merge(homeassistant::router())
         .merge(pihole::router())
         .merge(cloudflare::router())
+        .merge(auth::admin_router())
         .layer(axum::middleware::from_fn(auth::require_admin));
 
     let system_routes = Router::new()
@@ -95,6 +100,7 @@ pub fn app() -> Router {
         .merge(system::router())
         .merge(auth::two_factor_protected_router())
         .merge(auth::users_api::router())
+        .merge(auth::protected_router())
         .merge(system_routes)
         .layer(axum::middleware::from_fn(auth::require_auth))
         .with_state(state);
@@ -161,6 +167,8 @@ pub fn app() -> Router {
         .fallback_service(
             ServeDir::new("public").not_found_service(ServeFile::new("public/index.html")),
         )
+        // Compressao dinamica HTTP (Brotli, Gzip, Zstd)
+        .layer(CompressionLayer::new())
         // Cache-Control estrito: index.html e rotas SPA nunca em cache; assets imutáveis
         .layer(axum::middleware::from_fn(spa_cache_control_middleware))
 }
