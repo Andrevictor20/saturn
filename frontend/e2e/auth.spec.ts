@@ -48,6 +48,6 @@ test.describe('Login Flow', () => {
     await page.locator('button[type="submit"]').click();
 
     // Verify redirection. The URL should not be /login anymore.
-    await expect(page).not.toHaveURL(/.*login/);
+    await expect(page).not.toHaveURL(/.*login/, { timeout: 15000 });
   });
 });

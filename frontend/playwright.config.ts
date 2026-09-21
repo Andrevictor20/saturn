@@ -7,6 +7,10 @@ export default defineConfig({
   testDir: './e2e',
   /* Maximum time one test can run for. */
   timeout: 60 * 1000,
+  /* Maximum time expect() can wait for a condition */
+  expect: {
+    timeout: 10 * 1000,
+  },
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

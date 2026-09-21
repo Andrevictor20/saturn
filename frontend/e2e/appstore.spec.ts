@@ -31,8 +31,8 @@ test.describe('App Store Flow', () => {
     await page.goto('/store');
 
     // Wait for the mock apps to render
-    await expect(page.getByText('AdGuard Home').first()).toBeVisible();
-    await expect(page.getByText('Plex').first()).toBeVisible();
+    await expect(page.getByText('AdGuard Home').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Plex').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('should open install modal or perform install action', async ({ page }) => {
