@@ -74,7 +74,7 @@ export function Login() {
       }
 
       await login(data.token || 'logged_in_token');
-      navigate('/', { replace: true });
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message || t('auth.login_error', 'Erro ao realizar login.'));
     } finally {
@@ -116,7 +116,7 @@ export function Login() {
 
       const data = await response.json();
       await login(data.token || 'logged_in_token');
-      navigate('/');
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message || t('two_factor.invalid_code', 'Código inválido.'));
     } finally {
