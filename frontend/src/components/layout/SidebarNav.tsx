@@ -74,11 +74,11 @@ export function SidebarNav({ isSidebarOpen, isMobileMenuOpen, onClose }: Sidebar
           {isAdmin && <SidebarItem icon={HardDrive} label={t('sidebar.volumes')} to="/volumes" isCollapsed={isCollapsed} onClick={onClose} />}
         </div>
 
-        {isAdmin && (settings.integrations.homeassistant || settings.integrations.pihole || (settings.integrations.cloudflare ?? true)) && (
+        {isAdmin && (settings?.integrations?.homeassistant || settings?.integrations?.pihole || (settings?.integrations?.cloudflare ?? true)) && (
           <SidebarSection title={t('sidebar.integrations')} isCollapsed={isCollapsed}>
-            {settings.integrations.homeassistant && <SidebarItem icon={Home} label={t('sidebar.home_assistant')} to="/homeassistant" isCollapsed={isCollapsed} onClick={onClose} />}
-            {settings.integrations.pihole && <SidebarItem icon={ShieldCheck} label={t('sidebar.pihole')} to="/pihole" isCollapsed={isCollapsed} onClick={onClose} />}
-            {(settings.integrations.cloudflare ?? true) && <SidebarItem icon={Cloud} label={t('sidebar.cloudflare', 'Cloudflare')} to="/cloudflare" isCollapsed={isCollapsed} onClick={onClose} />}
+            {settings?.integrations?.homeassistant && <SidebarItem icon={Home} label={t('sidebar.home_assistant')} to="/homeassistant" isCollapsed={isCollapsed} onClick={onClose} />}
+            {settings?.integrations?.pihole && <SidebarItem icon={ShieldCheck} label={t('sidebar.pihole')} to="/pihole" isCollapsed={isCollapsed} onClick={onClose} />}
+            {(settings?.integrations?.cloudflare ?? true) && <SidebarItem icon={Cloud} label={t('sidebar.cloudflare', 'Cloudflare')} to="/cloudflare" isCollapsed={isCollapsed} onClick={onClose} />}
           </SidebarSection>
         )}
       </div>

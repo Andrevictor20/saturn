@@ -56,10 +56,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch('/api/system/settings');
       if (res.ok) {
-        const data: SystemSettings = await res.json();
-        setSettings(data);
-        localStorage.setItem(SATURN_STORAGE_KEY, JSON.stringify(data));
-              }
+        const data: Partial<SystemSettings> = await res.json();
+        const merged: SystemSettings = {
+          ...DEFAULT_SETTINGS,
+          ...data,
+          integrations: {
+            ...DEFAULT_SETTINGS.integrations,
+            ...(data.integrations || {}),
+          },
+        };
+        setSettings(merged);
+        localStorage.setItem(SATURN_STORAGE_KEY, JSON.stringify(merged));
+      }
     } catch {
       // offline / network error fallback to cached/default
     } finally {

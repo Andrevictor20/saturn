@@ -70,7 +70,7 @@ export function Login() {
       }
 
       await login(data.token || 'logged_in_token');
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || t('auth.login_error', 'Erro ao realizar login.'));
     } finally {
@@ -195,7 +195,7 @@ export function Login() {
           )}
 
           {step === 'credentials' ? (
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={handleSubmit} action="#">
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-primary">
                   {t('auth.username', 'Usuário')}

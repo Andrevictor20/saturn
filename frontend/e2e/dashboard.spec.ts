@@ -4,11 +4,35 @@ test.describe('Dashboard and Navigation', () => {
   test.beforeEach(async ({ page }) => {
     // Bypass auth and setup checks
     await page.route('**/api/auth/status', async route => {
-      await route.fulfill({ status: 200, json: { needs_setup: false } });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { needs_setup: false } });
     });
 
     await page.route('**/api/auth/me', async route => {
-      await route.fulfill({ status: 200, json: { username: 'admin' } });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { username: 'admin', role: 'admin' } });
+    });
+
+    // Mock system endpoints for clean overview bootstrap
+    await page.route('**/api/system/customization', async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', json: {} });
+    });
+    await page.route('**/api/system/settings', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          server_name: 'Saturn',
+          port: 5172,
+          default_page: '/',
+          metrics_refresh_rate: 5,
+          show_weather_card: true,
+          weather_city: '',
+          confirm_dangerous_actions: true,
+          integrations: { homeassistant: true, pihole: true, cloudflare: true }
+        }
+      });
+    });
+    await page.route('**/api/system/version', async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { version: '4.0.0', arch: 'x86_64' } });
     });
 
     await page.addInitScript(() => {

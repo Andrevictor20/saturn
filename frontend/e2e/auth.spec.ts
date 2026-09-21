@@ -24,28 +24,58 @@ test.describe('Login Flow', () => {
   test('should redirect to dashboard on successful login', async ({ page }) => {
     // Mock setup status (setup already done)
     await page.route('**/api/auth/status', async route => {
-      await route.fulfill({ status: 200, json: { needs_setup: false } });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { needs_setup: false } });
     });
 
     // Mock successful login
     await page.route('**/api/auth/login', async route => {
-      await route.fulfill({ status: 200, json: { token: 'mock-token-123' } });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { token: 'mock-token-123' } });
     });
 
     // Mock me endpoint
     await page.route('**/api/auth/me', async route => {
-      await route.fulfill({ status: 200, json: { username: 'admin' } });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { username: 'admin', role: 'admin' } });
+    });
+
+    // Mock system endpoints for smooth dashboard bootstrap
+    await page.route('**/api/system/customization', async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', json: {} });
+    });
+    await page.route('**/api/system/settings', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          server_name: 'Saturn',
+          port: 5172,
+          default_page: '/',
+          metrics_refresh_rate: 5,
+          show_weather_card: true,
+          weather_city: '',
+          confirm_dangerous_actions: true,
+          integrations: { homeassistant: true, pihole: true, cloudflare: true }
+        }
+      });
+    });
+    await page.route('**/api/system/version', async route => {
+      await route.fulfill({ status: 200, contentType: 'application/json', json: { version: '4.0.0', arch: 'x86_64' } });
     });
 
     // Mock docker containers
     await page.route('**/api/docker/containers', async route => {
-      await route.fulfill({ status: 200, json: [] });
+      await route.fulfill({ status: 200, contentType: 'application/json', json: [] });
     });
 
     await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
+
     await page.locator('#username').fill('admin');
     await page.locator('#password').fill('correctpassword');
-    await page.locator('button[type="submit"]').click();
+
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('/api/auth/login')),
+      page.locator('button[type="submit"]').click(),
+    ]);
 
     // Verify redirection. The URL should not be /login anymore.
     await expect(page).not.toHaveURL(/.*login/, { timeout: 15000 });
