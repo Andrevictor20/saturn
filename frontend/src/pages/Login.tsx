@@ -23,11 +23,15 @@ export function Login() {
   const [tempToken, setTempToken] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
 
-  const { login, needsSetup } = useAuth();
+  const { login, needsSetup, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   if (needsSetup) {
     return <Navigate to="/setup" replace />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -38,6 +38,10 @@ test.describe('App Store Flow', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', json: [] });
     });
 
+    await page.context().addCookies([
+      { name: 'saturn_token', value: 'mocked_token', url: 'http://localhost:5173' }
+    ]);
+
     await page.addInitScript(() => {
       try {
         window.localStorage.setItem('saturn_token', 'mocked_token');
@@ -60,6 +64,7 @@ test.describe('App Store Flow', () => {
 
   test('should display apps in the store catalog', async ({ page }) => {
     await page.goto('/store');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for the mock apps to render
     await expect(page.getByText('AdGuard Home').first()).toBeVisible({ timeout: 15000 });
