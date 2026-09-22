@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -24,7 +24,6 @@ export function Login() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
 
   const { login, needsSetup, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
 
   if (needsSetup) {
     return <Navigate to="/setup" replace />;
