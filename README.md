@@ -4,182 +4,229 @@
 
 # Saturn
 
-### O Sistema Operacional Moderno para seu Homelab & Contêineres Docker
-
-**Leve. Ultrarrápido. Desenhado para quem exige controle absoluto e odeia lentidão.**  
-*Monitore hardware a 60 FPS, orquestre stacks Compose, publique túneis Cloudflare e instale mais de 920 aplicativos em 1 clique.*
+Painel de gerenciamento leve para contêineres Docker e telemetria de hosts Linux.  
+Desenvolvido em Rust (Axum, Tokio) e React 19 em contêiner único compilado para servidores dedicados, VPS e dispositivos ARM64.
 
 [![CI Pipeline](https://github.com/Andrevictor20/saturn/actions/workflows/ci.yml/badge.svg)](https://github.com/Andrevictor20/saturn/actions/workflows/ci.yml)
 [![Docker Multi-Arch](https://img.shields.io/badge/GHCR-Multi--Arch%20(amd64%20%7C%20arm64)-blue?logo=docker)](https://github.com/Andrevictor20/saturn/pkgs/container/saturn)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-victorandre280%2Fsaturn-2496ED?logo=docker)](https://hub.docker.com/r/victorandre280/saturn)
 [![Backend](https://img.shields.io/badge/Backend-Rust%20%2B%20Axum%200.8-orange?logo=rust)](https://www.rust-lang.org/)
-[![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite%208-61DAFB?logo=react)](https://react.dev/)
+[![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite-61DAFB?logo=react)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Style-Tailwind%20CSS%20v4-38B2AC?logo=tailwindcss)](https://tailwindcss.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <br/>
 
-```bash
-# ⚡ Instale o Saturn no seu servidor em menos de 30 segundos
-curl -fsSL https://raw.githubusercontent.com/Andrevictor20/saturn/main/install.sh | bash
-```
-
-<br/>
-
-[Começar Agora](#-instalação-em-30-segundos) •
-[Funcionalidades](#-por-que-o-saturn) •
-[Demonstração](#-veja-o-saturn-em-ação) •
-[App Store](#-app-store-oficial-saturn-apps) •
-[Documentação Completa](#-documentação-técnica-aprofundada)
+[Início Rápido](#inicio-rapido) •
+[Especificações Técnicas](#especificacoes-tecnicas) •
+[Capacidades do Sistema](#capacidades-do-sistema) •
+[Demonstração](#demonstracao) •
+[Documentação Técnica](#documentacao-tecnica) •
+[Licença](#licenca)
 
 </div>
 
 ---
 
-## ⚡ Instalação em 30 Segundos
+## Visão Geral
 
-Chega de arquivos de configuração intermináveis ou instaladores que quebram no meio do caminho. Com apenas um comando no terminal do seu servidor (Linux PC, Raspberry Pi ou VPS), o Saturn detecta seu hardware, configura permissões, baixa a imagem oficial e entrega seu painel pronto:
+O Saturn é uma plataforma de gerenciamento e observabilidade para infraestrutura baseada em Docker e Linux. O sistema substitui painéis pesados de administração por uma arquitetura enxuta em Rust, operando com consumo inferior a 25 MB de RAM em repouso. O backend em Axum comunica-se diretamente com o Docker Engine via Unix Domain Socket e com o kernel Linux através de interfaces de pseudo-arquivos (`/proc` e `/sys`), transmitindo métricas para a interface React via conexões persistentes WebSocket.
+
+---
+
+## Especificações Técnicas
+
+| Parâmetro | Especificação |
+| :--- | :--- |
+| **Arquiteturas Alvo** | `linux/amd64` (x86_64) e `linux/arm64` (aarch64, ex.: Raspberry Pi 4/5) |
+| **Consumo de Memória (Idle)** | Entre 15 MB e 25 MB RSS |
+| **Porta Padrão** | `5172/tcp` (HTTP REST e WebSocket) |
+| **Comunicação com Host** | Unix Domain Socket (`/var/run/docker.sock`) e pseudo-arquivos (`/host/proc`, `/host/sys`) |
+| **Taxa de Amostragem** | Ciclos periódicos de 1000ms com buffer circular em memória (`VecDeque`) |
+| **Criptografia & Autenticação** | Hashing de credenciais via Argon2id e sessões JWT assinadas por segredo CSPRNG de 64 bytes |
+| **Concorrência de Arquivos** | Validação de pré-condição HTTP ETag / `If-Match` (RFC 7232) e escrita atômica |
+| **Streaming de Mídia** | Resposta HTTP 206 Partial Content (RFC 7233) com cache de miniaturas SHA-256 |
+
+---
+
+## Início Rápido
+
+### Método 1: Implantação Declarativa (Docker Compose)
+
+Crie um arquivo `docker-compose.yml`:
+
+```yaml
+services:
+  saturn:
+    image: ghcr.io/andrevictor20/saturn:latest
+    container_name: saturn
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    network_mode: bridge
+    ports:
+      - "5172:5172"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - saturn_data:/app/data
+      - /:/host:rslave
+      - /mnt:/mnt:rslave
+      - /media:/media:rslave
+    environment:
+      - RUST_LOG=info
+      - SSH_HOST=host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  saturn_data:
+```
+
+Inicie o serviço:
+
+```bash
+docker compose up -d
+```
+
+### Método 2: Execução Direta via Docker CLI
+
+```bash
+docker run -d \
+  --name saturn \
+  --restart unless-stopped \
+  --privileged \
+  --pid host \
+  --add-host host.docker.internal:host-gateway \
+  -p 5172:5172 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v saturn_data:/app/data \
+  -v /:/host:rslave \
+  -v /mnt:/mnt:rslave \
+  -v /media:/media:rslave \
+  -e RUST_LOG=info \
+  -e SSH_HOST=host.docker.internal \
+  ghcr.io/andrevictor20/saturn:latest
+```
+
+### Método 3: Instalador Automatizado (Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Andrevictor20/saturn/main/install.sh | bash
 ```
 
-> **Após rodar:** Acesse `http://<ip-do-servidor>:5172` no seu navegador desktop ou celular e crie sua conta de administrador.
+Após iniciar o container, acesse a interface em `http://<ip-do-servidor>:5172` e conclua a criação da credencial administrativa no assistente inicial (`/setup`).
 
-Precisa de implantação declarativa com Docker Compose ou quer rodar atrás de um proxy reverso (Nginx, Caddy, Traefik)?  
-👉 **[Consulte o Guia Completo de Instalação e Implantação (docs/INSTALLATION.md)](docs/INSTALLATION.md)**
-
----
-
-## 💎 Por que o Saturn?
-
-Gerenciadores tradicionais de homelab costumam ser lentos, pesados ou atrelados a ecossistemas proprietários fechados. O Saturn foi concebido do zero com padrões rigorosos de engenharia para resolver essas dores:
-
-| O Desafio Comum | A Solução do Saturn |
-| :--- | :--- |
-| **Painéis pesados que travam:** Dashboards em Python/Node consomem 300MB+ de RAM apenas para exibir gráficos. | **Engine Nativa em Rust:** Consumo de **< 25 MB de RAM** em repouso e zero lag, voando até num Raspberry Pi 3. |
-| **Instalar apps às cegas:** Você baixa um contêiner e só descobre que ele não suporta ARM64 depois que ele falha em loop. | **Inteligência de CPU na Loja:** A App Store detecta a CPU do seu servidor e avisa se um app é compatível antes do download. |
-| **Conflitos de portas e rotas:** Túneis e links que apontam para o app errado ou misturam subdomínios. | **Roteamento Port-First:** Descoberta determinística de portas com guarda estrita contra conflitos e sincronização Cloudflare. |
-| **Processos opacos:** O servidor fica em 100% de uso e você só vê `python3` ou `node` consumindo tudo sem saber qual app é o culpado. | **In-Card Top 5 com Nomes Reais:** O painel cruza o PID do processo com os contêineres Docker e mostra o nome e ícone oficial do app. |
-| **Design genérico e cansativo:** Interfaces sem carinho visual ou fundos cinzas que não aproveitam telas modernas. | **Preto OLED Puro & Cores Dinâmicas:** Tema Full Black (`#000000`) com pixels desligados e cores adaptadas do seu wallpaper. |
+Consulte [docs/INSTALLATION.md](docs/INSTALLATION.md) para configurações com systemd, compilação a partir do código-fonte e proxies reversos (Nginx, Caddy, Traefik).
 
 ---
 
-## 🎬 Veja o Saturn em Ação
+## Capacidades do Sistema
 
-Uma interface viva, hiper-responsiva e calibrada para touch e teclado, atualizada em tempo real via WebSockets sem exigir recarregamentos de página.
+### Telemetria e Monitoramento de Recursos
+- **Amostragem em Tempo Real:** Coleta contínua de métricas de processador, memória física, swap, I/O de disco e tráfego de interfaces de rede ativas a cada 1000ms.
+- **Histórico Imediato:** Buffer circular em memória no backend que provê dados temporais imediatos a novos clientes web sem aguardar ciclos de agregação.
+- **Cálculo Resiliente de Memória:** Implementação alinhada ao cálculo canônico da Docker CLI (`calculateMemUsageUnixNoCache`), com fallback automático para soma de RSS via `/proc/<pid>/statm` quando a contabilidade de cgroups estiver desativada no kernel do host.
+
+### Orquestração de Contêineres e Stacks Compose
+- **Ciclo de Vida de Contêineres:** Controle operacional (iniciar, parar, reiniciar, pausar, remover) com streaming assíncrono de logs via WebSocket.
+- **Priorização Determinística de Portas:** Algoritmo que inspeciona ligações de portas IPv4/IPv6, portas padrão em `network_mode: host` e serviços web conhecidos para gerar links de acesso diretos.
+- **Pull Concorrente e Otimizado:** Rotina de atualização com injeção de parâmetros de concorrência (`DOCKER_BUILDKIT=1`, `COMPOSE_PARALLEL_LIMIT=8`) e identificação direta da arquitetura nativa do host (`platform: get_host_platform()`).
+
+### Catálogo de Aplicações (App Store Desacoplada)
+- **Estrutura Baseada em Manifestos:** Mais de 920 aplicações prontas para implantação com validação estrita de arquitetura (`amd64` / `arm64`) antes da execução do download.
+- **Operação Desconectada e Cache:** Consulta a índices pré-compilados via CDN com persistência local em `/app/data/cached_apps.json` para operação sob falha de conectividade externa.
+- **Fontes Customizadas:** Suporte a repositórios comunitários adicionais configurados via `/app/data/stores.json`. Consulte [docs/APP_STORE.md](docs/APP_STORE.md).
+
+### Gerenciador de Arquivos e Concorrência Otimista (OCC)
+- **Concorrência Otimista via RFC 7232:** Controle de versão no editor de arquivos através do cabeçalho `ETag` (carimbo temporal em nanossegundos e tamanho em bytes). Rejeição com HTTP `412 Precondition Failed` em caso de concorrência de escrita, exibindo interface de resolução de conflitos (recarregar, sobrescrever ou salvar cópia).
+- **Streaming Parcial (RFC 7233):** Atendimento a requisições de faixa de bytes (`Range: bytes=start-end`) para reprodução instantânea de mídias e legendas WebVTT.
+- **Cache de Miniaturas:** Geração assíncrona de prévias gráficas com indexação por hash SHA-256 persistida em disco.
+
+### Terminal Web e Console Host
+- **Emulação de Terminal PTY:** Sessões interativas conectadas diretamente ao shell do host (`/bin/bash` ou `/bin/sh`) ou de contêineres através de `portable-pty` e `@xterm/xterm` sobre WebSocket.
+- **Proxy SSH Integrado:** Túnel para conexão com outros servidores da rede local ou remotos.
+
+### Sincronização de Rotas e Túneis Cloudflare
+- **Mapeamento Port-First:** Associação determinística de domínios públicos a contêineres locais validando a existência da porta exposta antes da criação do túnel.
+- **Port Conflict Guard:** Prevenção de colisões de rotas e alertas em caso de serviços duplicados ou portas inacessíveis.
+
+### Backups de Estado e Restauração
+- **Snapshots Atômicos:** Empacotamento de configurações, manifests Compose, metadados de integrações (`cloudflare.json`, `homeassistant.json`, `pihole.json`) e banco SQLite em arquivos `.tar.gz`.
+- **Restauração em Quente:** Descompactação e invalidação imediata de caches de memória com recriação de contêineres sem necessidade de reiniciar o processo principal.
+
+### Integrações Homelab
+- **Home Assistant:** Agrupamento estruturado de dispositivos por áreas físicas com proxy reverso autenticado para tokens de longa duração.
+- **Pi-hole:** Monitoramento de consultas DNS bloqueadas e controle de ativação de filtragem via API nativa.
+
+---
+
+## Demonstração
 
 ### Visão Geral & Telemetria em Tempo Real
-Acompanhe CPU, RAM, conexões ativas, armazenamento multi-disco e temperatura a 60 FPS com histórico contínuo.
+Acompanhamento contínuo de métricas de CPU, memória, interfaces de rede, temperatura e armazenamento:
 ![Saturn Overview](./docs/videos/overview.webp)
 
-### Controle Total de Contêineres & Stacks Compose
-Inicie, pause, reinicie, edite composes, inspecione portas e atualize imagens em segundo plano sem travar o navegador.
+### Gerenciamento de Contêineres e Stacks Compose
+Controle operacional e edição de definições declarativas:
 ![Saturn Containers](./docs/videos/containers.webp)
 
-### Loja com 920+ Apps & Inteligência Multi-Plataforma
-Catálogo autônomo e instantâneo com chips de arquitetura, badges de alerta e filtro para a CPU do seu host.
+### Catálogo de Aplicações
+Catálogo de aplicações com filtragem por arquitetura de hardware:
 ![Saturn App Store](./docs/videos/appstore.webp)
 
 <details>
-<summary><b>🔍 Clique para ver mais capturas de tela (Métricas, Terminal, Disco, Temas e Integrações)</b></summary>
+<summary><b>Capturas de Tela Adicionais (Métricas, Terminal, Disco, Temas e Integrações)</b></summary>
 <br/>
 
-| Seção | Demonstração Visual |
+| Módulo | Amostra |
 | :--- | :--- |
 | **Histórico Contínuo de Métricas** | ![Metrics](./docs/images/metrics.png) |
-| **Analisador de Espaço em Disco** | ![Disk Analyzer](./docs/images/disk_analyzer.png) |
+| **Analisador de Armazenamento em Disco** | ![Disk Analyzer](./docs/images/disk_analyzer.png) |
 | **Central de Logs com Busca Instantânea** | ![Logs](./docs/images/logs.png) |
 | **Terminal Web Integrado (PTY Nativo)** | ![Terminal](./docs/images/terminal.png) |
 | **Autenticação Criptografada (Argon2id)** | ![Login](./docs/images/login.png) |
 | **Gerenciador de Arquivos com Prévias Inline** | ![File Manager](./docs/images/file_manager.png) |
 | **Transição de Temas e Cores Adaptativas** | ![Themes](./docs/videos/themes.webp) |
-| **Integração Nativa com Home Assistant** | ![Home Assistant](./docs/images/home_assistant.png) |
+| **Integração com Home Assistant** | ![Home Assistant](./docs/images/home_assistant.png) |
 
 </details>
 
 ---
 
-## ✨ Recursos de Destaque
+## Segurança e DevSecOps
 
-### 📦 App Store Desacoplada com 920+ Apps Prontos
-- **Catálogo Autônomo Oficial (`saturn-apps`):** Mais de 920 aplicações prontas para subir com 1 clique, com composes limpos e sem dependências de terceiros.
-- **Detecção de CPU e Alerta de Incompatibilidade:** Identificação automática da CPU (`x86_64` vs `ARM64`) com chips visuais e avisos preventivos para apps exclusivos de PC ou Raspberry Pi.
-- **Filtro Inteligente de Arquitetura:** Um clique para listar apenas os apps 100% garantidos para o seu processador.
-- **Gerenciador de Repositórios Comunitários:** Adicione e alterne lojas customizadas de terceiros via URL em segundos (`/app/data/stores.json`).
-👉 *Saiba como o catálogo funciona e como enviar seus próprios apps:* **[Guia da App Store (docs/APP_STORE.md)](docs/APP_STORE.md)**
+O desenvolvimento do Saturn segue os princípios de **Security by Design** e **Menor Privilégio**:
+- **Hashing de Senhas:** Implementação com Argon2id resistente a ataques baseados em aceleração por GPU/ASIC.
+- **Proteção de Processos Críticos:** O endpoint `kill_process` bloqueia tentativas de interrupção direcionadas ao PID do Saturn, PID 1 (`init`/`systemd`) e daemons essenciais (`dockerd`, `sshd`, `containerd`).
+- **Política de CORS Dinâmico:** Restrição de chamadas de API a origens locais (loopback, faixas privadas RFC 1918 e redes de túnel confiáveis).
+- **Proteção de Cabeçalhos:** Injeção estrita de `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` e `Strict-Transport-Security`.
 
-### 🖥️ Terminal Web Direto & Shell do Servidor
-- **Acesso ao Console com 1 Clique:** Abra o shell nativo do host (`/bin/bash` ou `/bin/sh`) diretamente no navegador com PTY interativo via WebSockets, sem precisar configurar chaves ou portas SSH.
-- **Suporte a Proxy SSH:** Conecte-se também a outras máquinas ou contêineres remotos via SSH com segurança e redimensionamento dinâmico de janela.
-
-### 📊 In-Card Top 5 & Mapeamento Amigável de Processos
-- **Alternador Integrado no Card:** Alterne entre os medidores visuais de CPU e RAM e a lista dos 5 processos que mais demandam recursos no momento.
-- **Identificação Real do Aplicativo:** Chega de adivinhar o que é `python3`, `java` ou `php-fpm`. O Saturn cruza os PIDs com o daemon Docker e exibe o nome amigável e o ícone oficial (ex: *Home Assistant*, *Kavita*, *Jellyfin*).
-
-### 🎬 Streaming Fluido (RFC 7233) & Miniaturas Instantâneas
-- **Streaming de Vídeo sem Travamentos:** Suporte a requisições HTTP 206 com busca instantânea de metadados (`Range: bytes=-N`), permitindo reproduzir vídeos em contêineres MP4/MKV e legendas WebVTT com carregamento imediato.
-- **Cache Inteligente de Miniaturas:** Geração rápida e cache em disco (SHA-256) para prévias inline de imagens, vídeos e capas de PDFs no gerenciador de arquivos.
-
-### 🛡️ Túneis Cloudflare com Roteamento Port-First
-- **Correspondência Confiável:** Vinculação inteligente de rotas com base na porta de rede do contêiner, eliminando associações incorretas por nomes parecidos.
-- **Port Conflict Guard:** Blindagem estrita que impede associar serviços a contêineres que não possuam a porta requisitada.
-- **Vínculos Manuais Bidirecionais:** Associe ou desvincule contêineres diretamente na tabela de rotas com atualização em tempo real.
-
-### 🔄 Backups de Estado Completo & Restauração Resiliente
-- **Snapshot Integral com 1 Clique:** Salve seus arquivos de compose, banco de dados, customizações visuais e todas as integrações (`homeassistant.json`, `cloudflare.json`, `pihole.json`, etc.).
-- **Auto-Descoberta de Conteúdo:** Restauração inteligente a partir de arquivos `.tar.gz` de até 10GB, recriando contêineres automaticamente e invalidando caches em memória sem necessidade de reiniciar o sistema.
-
-### 🎨 Design System de Elite & Tema Preto OLED
-- **Preto OLED Puro (`#000000`):** Economize energia e alcance contraste infinito em telas OLED e monitores escuros, com cartões em acabamento translúcido premium.
-- **Cores Adaptativas do Wallpaper:** Carregue qualquer imagem de fundo e o Saturn extrai automaticamente paletas de acento vivas e calibradas.
-- **Paletas Pré-Calibradas:** Alterne instantaneamente entre Zinc, Blue, Rose, Green, Catppuccin e Tokyo Night.
-
-### 🏠 Integrações Nativas Homelab (Home Assistant & Pi-hole)
-- **Home Assistant:** Agrupamento inteligente de dispositivos por cômodos/áreas e controle unificado de automações com proxy seguro de tokens.
-- **Pi-hole:** Monitore tráfego de DNS, consulte percentual de anúncios bloqueados e ative/desative a proteção com 1 toque.
+Consulte [docs/SECURITY.md](docs/SECURITY.md) para o modelo de ameaças completo (STRIDE) e políticas de reporte de vulnerabilidades.
 
 ---
 
-## 🔒 Segurança de Nível Corporativo (SSDLC)
+## Documentação Técnica
 
-O Saturn foi arquitetado sob o princípio de Zero Trust para ambientes domésticos e corporativos:
-- **Hashing Criptográfico Argon2id:** Senhas armazenadas com máxima resistência contra ataques de força bruta via GPU.
-- **Sessões JWT Criptografadas:** Segredo de sessão gerado por CSPRNG de 64 bytes com rotação segura.
-- **Defesa em Profundidade:** Proteção contra ataques IDOR, isolamento de comandos contra processos vitais do sistema operacional (PID 1, `systemd`, `dockerd`) e cabeçalhos defensivos rigorosos (`CSP`, `X-Frame-Options: DENY`, `CORS` estrito para RFC 1918).
-👉 *Consulte a política completa em:* **[Segurança da Informação e Políticas (docs/SECURITY.md)](docs/SECURITY.md)**
-
----
-
-## 📚 Documentação Técnica Aprofundada
-
-Cada parte da engenharia do Saturn é documentada de forma detalhada e transparente:
-
-| Guia | Descrição |
+| Documento | Escopo |
 | :--- | :--- |
-| 🚀 **[Instalação e Implantação](docs/INSTALLATION.md)** | Instruções passo a passo para Docker, Docker Compose, systemd, reverse proxies (Nginx, Traefik, Caddy) e compilação manual a partir do código-fonte. |
-| 🛍️ **[App Store & Adição de Apps](docs/APP_STORE.md)** | Como navegar pelo catálogo, submeter novos aplicativos para a loja oficial e adicionar fontes comunitárias via JSON. |
-| 🏗️ **[Arquitetura do Sistema](docs/ARCHITECTURE.md)** | Detalhes do daemon em Rust, Tokio runtime, sockets IPC, modelo de concorrência, comunicação WebSocket e frontend React 19. |
-| 🛡️ **[Políticas de Segurança](docs/SECURITY.md)** | Threat Modeling (STRIDE), governança de autenticação, proteção de segredos, mitigação de abusos e conformidade SSDLC. |
-| 🧪 **[Testes e Qualidade](docs/TESTING.md)** | Pirâmide de testes (Unitários, Integração, E2E com Playwright, DAST com OWASP ZAP e testes de estresse com k6). |
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Métodos de instalação, compose, systemd, proxies reversos (Nginx, Caddy, Traefik) e compilação do código-fonte. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura interna do daemon Rust, runtime Tokio, comunicação por sockets e design do frontend React 19. |
+| [docs/APP_STORE.md](docs/APP_STORE.md) | Especificação de manifestos `saturn-app.yml`, empacotamento Compose e submissão de novos aplicativos. |
+| [docs/SECURITY.md](docs/SECURITY.md) | Modelo de ameaças (STRIDE), governança criptográfica, controle de acesso e auditoria DevSecOps. |
+| [docs/TESTING.md](docs/TESTING.md) | Estratégia de testes (Unitários, Integração em Axum, E2E com Playwright, DAST com OWASP ZAP e carga com k6). |
 
 ---
 
-## 🤝 Comunidade e Contribuições
+## Contribuições
 
-Contribuições são muito bem-vindas! Seja criando novos recursos no painel, otimizando o backend em Rust ou empacotando aplicativos para a App Store:
-1. Faça um Fork do projeto no GitHub.
-2. Crie uma branch para sua funcionalidade (`git checkout -b feat/minha-melhoria`).
-3. Commit suas alterações seguindo o padrão de commits atômicos (`git commit -m "feat(store): adiciona novo filtro de categorias"`).
-4. Abra um Pull Request detalhado.
+Para contribuir com o desenvolvimento do Saturn ou com o catálogo de aplicações:
+1. Faça um Fork do repositório no GitHub.
+2. Crie uma branch para sua alteração (`git checkout -b feat/nome-da-funcionalidade`).
+3. Siga a política de testes e verificação estática antes de submeter commits (`cargo test`, `npm test`, `npm run lint`).
+4. Abra um Pull Request com a descrição técnica e justificativa das mudanças.
 
 ---
 
-## 📄 Licença
+## Licença
 
-Este projeto é software livre licenciado sob os termos da licença **MIT**. Consulte o arquivo [LICENSE](LICENSE) para maiores informações.
-
-<div align="center">
-<br/>
-<b>Construído com orgulho para a comunidade homelab e apaixonados por computação autônoma.</b>
-</div>
+Distribuído sob os termos da licença **MIT**. Consulte o arquivo [LICENSE](LICENSE) para mais informações.

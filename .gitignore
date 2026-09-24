@@ -3,6 +3,8 @@
 AGENTS.md
 CLAUDE.md
 GEMINI.md
+.geminiignore
+.antigravityignore
 brain/
 
 # Ambientes e Variáveis Sensíveis

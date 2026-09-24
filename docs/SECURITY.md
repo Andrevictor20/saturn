@@ -61,7 +61,7 @@ Para mitigar requisições forjadas entre sites (CSRF) originadas da internet p�
 - Redes privadas seguras Tailscale (faixa CGNAT `100.64.0.0/10` e domínios `*.ts.net`).
 - Conexões seguras via Cloudflare Tunnels (`*.trycloudflare.com`).
 
-Origens públicas desconhecidas são sumariamente bloqueadas.
+Origens públicas não autorizadas são rejeitadas com erro HTTP 403 Forbidden.
 
 ### 4.2 Cabeçalhos de Segurança HTTP
 O backend Axum injeta em todas as respostas os cabeçalhos de segurança padronizados pelo OWASP:
