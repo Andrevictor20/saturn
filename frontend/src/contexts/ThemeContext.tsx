@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { 
   type WallpaperThemePalette, 
   extractPaletteFromImage, 
   DEFAULT_WALLPAPER_PALETTE 
 } from "../utils/wallpaperPalette";
+import { getAuthHeaders } from "../utils/auth";
 
 export type Theme = "dark" | "light" | "system";
 export type ColorVariant = 
@@ -46,6 +47,7 @@ export type ThemeProviderState = {
   wallpaperBlur: number;
   setWallpaperBlur: (blur: number) => void;
   wallpaperPalette: WallpaperThemePalette | null;
+  reloadCustomization: () => Promise<void>;
 };
 
 const initialState: ThemeProviderState = {
@@ -62,6 +64,7 @@ const initialState: ThemeProviderState = {
   wallpaperBlur: 0,
   setWallpaperBlur: () => null,
   wallpaperPalette: null,
+  reloadCustomization: async () => {},
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -216,41 +219,69 @@ export function ThemeProvider({
     }
   }, [theme, color]);
 
+  const reloadCustomization = useCallback(async () => {
+    try {
+      const res = await fetch('/api/system/customization');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data) return;
+
+      if (data.theme) {
+        setTheme(data.theme);
+        localStorage.setItem(storageKey, data.theme);
+      }
+      if (data.color) {
+        const finalColor = data.color === 'onedark' ? 'oled' : data.color;
+        setColor(finalColor);
+        localStorage.setItem(colorStorageKey, finalColor);
+      }
+      if (data.custom_avatar !== undefined) {
+        setCustomAvatar(data.custom_avatar);
+        if (data.custom_avatar) localStorage.setItem(avatarStorageKey, data.custom_avatar);
+        else localStorage.removeItem(avatarStorageKey);
+      }
+      if (data.wallpaper_url !== undefined) {
+        setWallpaperUrl(data.wallpaper_url);
+        if (data.wallpaper_url) localStorage.setItem(wallpaperStorageKey, data.wallpaper_url);
+        else localStorage.removeItem(wallpaperStorageKey);
+      }
+      if (data.wallpaper_opacity !== undefined) {
+        setWallpaperOpacity(data.wallpaper_opacity);
+        localStorage.setItem(wallpaperOpacityKey, data.wallpaper_opacity.toString());
+      }
+      if (data.wallpaper_blur !== undefined) {
+        setWallpaperBlur(data.wallpaper_blur);
+        localStorage.setItem(wallpaperBlurKey, data.wallpaper_blur.toString());
+      }
+    } catch {
+      // Ignore network errors
+    }
+  }, [storageKey, colorStorageKey, avatarStorageKey, wallpaperStorageKey, wallpaperOpacityKey, wallpaperBlurKey]);
+
   useEffect(() => {
-    fetch('/api/system/customization')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) {
-          if (data.theme) {
-            setTheme(data.theme);
-            localStorage.setItem(storageKey, data.theme);
-          }
-          if (data.color) {
-            const finalColor = data.color === 'onedark' ? 'oled' : data.color;
-            setColor(finalColor);
-            localStorage.setItem(colorStorageKey, finalColor);
-          }
-          if (data.custom_avatar !== undefined) {
-            setCustomAvatar(data.custom_avatar);
-            if (data.custom_avatar) localStorage.setItem(avatarStorageKey, data.custom_avatar);
-            else localStorage.removeItem(avatarStorageKey);
-          }
-          if (data.wallpaper_url !== undefined) {
-            setWallpaperUrl(data.wallpaper_url);
-            if (data.wallpaper_url) localStorage.setItem(wallpaperStorageKey, data.wallpaper_url);
-            else localStorage.removeItem(wallpaperStorageKey);
-          }
-          if (data.wallpaper_opacity !== undefined) {
-            setWallpaperOpacity(data.wallpaper_opacity);
-            localStorage.setItem(wallpaperOpacityKey, data.wallpaper_opacity.toString());
-          }
-          if (data.wallpaper_blur !== undefined) {
-            setWallpaperBlur(data.wallpaper_blur);
-            localStorage.setItem(wallpaperBlurKey, data.wallpaper_blur.toString());
-          }
-        }
-      })
-      .catch(() => {});
+    reloadCustomization();
+  }, [reloadCustomization]);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === storageKey && e.newValue) {
+        setTheme(e.newValue as Theme);
+      } else if (e.key === colorStorageKey && e.newValue) {
+        setColor(e.newValue === 'onedark' ? 'oled' : (e.newValue as ColorVariant));
+      } else if (e.key === avatarStorageKey) {
+        setCustomAvatar(e.newValue);
+      } else if (e.key === wallpaperStorageKey) {
+        setWallpaperUrl(e.newValue);
+      } else if (e.key === wallpaperOpacityKey && e.newValue) {
+        const val = parseFloat(e.newValue);
+        if (!isNaN(val)) setWallpaperOpacity(val);
+      } else if (e.key === wallpaperBlurKey && e.newValue) {
+        const val = parseFloat(e.newValue);
+        if (!isNaN(val)) setWallpaperBlur(val);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [storageKey, colorStorageKey, avatarStorageKey, wallpaperStorageKey, wallpaperOpacityKey, wallpaperBlurKey]);
 
   const syncToBackend = (partial: {
@@ -271,7 +302,10 @@ export function ThemeProvider({
     };
     fetch('/api/system/customization', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
       body: JSON.stringify(payload),
     }).catch(() => {});
   };
@@ -322,6 +356,7 @@ export function ThemeProvider({
       syncToBackend({ wallpaper_blur: blur });
     },
     wallpaperPalette,
+    reloadCustomization,
   };
 
   return (

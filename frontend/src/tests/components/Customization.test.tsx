@@ -213,4 +213,97 @@ describe('Visual Customization & Developer Themes', () => {
     expect(screen.getByText(/Plano de Fundo/i)).toBeTruthy();
     expect(screen.getByText('Nebulosa Espacial')).toBeTruthy();
   });
+
+  it('loads customization from backend when localStorage is empty (e.g. mobile or incognito)', async () => {
+    const originalFetch = window.fetch;
+    window.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/system/customization') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            theme: 'dark',
+            color: 'nord',
+            wallpaper_url: 'https://example.com/server-wallpaper.webp',
+            wallpaper_opacity: 0.75,
+            wallpaper_blur: 8,
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const { act, waitFor } = await import('@testing-library/react');
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <ThemeConsumer />
+        </ThemeProvider>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-color').textContent).toBe('nord');
+      expect(screen.getByTestId('current-wallpaper').textContent).toBe('https://example.com/server-wallpaper.webp');
+      expect(screen.getByTestId('current-opacity').textContent).toBe('0.75');
+      expect(screen.getByTestId('current-blur').textContent).toBe('8');
+    });
+
+    expect(localStorage.getItem('saturn-wallpaper-url')).toBe('https://example.com/server-wallpaper.webp');
+    window.fetch = originalFetch;
+  });
+
+  it('sends auth token in Authorization header when saving customization', async () => {
+    localStorage.setItem('saturn_token', 'mock-bearer-token');
+    const originalFetch = window.fetch;
+    let postCallHeaders: any = null;
+
+    window.fetch = vi.fn().mockImplementation((url, options) => {
+      if (url === '/api/system/customization' && options?.method === 'POST') {
+        postCallHeaders = options.headers;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    render(
+      <ThemeProvider>
+        <ThemeConsumer />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(screen.getByText('Set Dracula'));
+
+    const { waitFor } = await import('@testing-library/react');
+    await waitFor(() => {
+      expect(postCallHeaders).toBeTruthy();
+      expect(postCallHeaders['Authorization']).toBe('Bearer mock-bearer-token');
+    });
+
+    window.fetch = originalFetch;
+    localStorage.removeItem('saturn_token');
+  });
+
+  it('syncs customization across browser tabs via storage event', async () => {
+    render(
+      <ThemeProvider>
+        <ThemeConsumer />
+      </ThemeProvider>
+    );
+
+    const { act, waitFor } = await import('@testing-library/react');
+    // Simulate change from another tab
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'saturn-wallpaper-url',
+          newValue: 'https://example.com/synced-tab.webp',
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-wallpaper').textContent).toBe('https://example.com/synced-tab.webp');
+    });
+  });
 });

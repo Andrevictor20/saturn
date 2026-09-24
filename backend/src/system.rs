@@ -33,11 +33,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/system/weather", axum::routing::get(weather::get_weather_handler))
         .route("/api/system/disks/smart", axum::routing::get(smart::get_disks_smart_handler))
         .route("/api/system/settings", axum::routing::get(settings::get_settings_handler))
-        .route("/api/system/customization", axum::routing::get(customization::get_customization_handler))
         .merge(admin_routes)
 }
 
 pub fn public_router() -> Router {
     Router::new()
         .route("/api/system/update/status", axum::routing::get(get_update_status_handler))
+        .route("/api/system/customization", axum::routing::get(customization::get_customization_handler))
 }
