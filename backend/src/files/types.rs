@@ -143,11 +143,22 @@ pub struct SubtitleItem {
     pub lang: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct AudioTrackItem {
+    pub index: usize,
+    pub label: String,
+    pub lang: String,
+    pub codec: String,
+    pub channels: u32,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SubtitlesResponse {
     pub subtitles: Vec<SubtitleItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audio_tracks: Vec<AudioTrackItem>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,6 +258,8 @@ pub struct TranscodeQuery {
     pub path: String,
     pub start: Option<f64>,
     pub mode: Option<String>,
+    pub audio: Option<usize>,
+    pub max_height: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

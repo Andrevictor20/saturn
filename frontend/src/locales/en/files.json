@@ -260,5 +260,10 @@
   "upload_single_success": "Upload of \"{{name}}\" completed successfully!",
   "original_file_not_found": "Original file not found. Please re-upload the file.",
   "upload_cancelled": "Upload cancelled",
-  "upload_page_reloaded": "Page reloaded. Click Resume to continue uploading."
+  "upload_page_reloaded": "Page reloaded. Click Resume to continue uploading.",
+  "select_audio_track": "Select audio track",
+  "audio_default": "Audio: Default",
+  "sub_delay": "Delay subtitle (-0.5s)",
+  "sub_advance": "Advance subtitle (+0.5s)",
+  "reset_sub_sync": "Reset sync to 0s"
 }

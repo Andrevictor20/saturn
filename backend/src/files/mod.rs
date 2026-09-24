@@ -11,6 +11,7 @@ pub mod shares;
 pub mod samba;
 pub mod chunked_upload;
 pub mod thumbnails;
+pub mod subtitle_parser;
 
 pub use types::*;
 pub use path_utils::*;

@@ -3,6 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { parseWebVtt, convertTextToVttBlob, type SubtitleCue } from '../../utils/vttParser';
 import type { SubtitleItem } from './VideoSubtitleMenu';
 
+export interface AudioTrackItem {
+  index: number;
+  label: string;
+  lang: string;
+  codec: string;
+  channels: number;
+}
+
 interface UseVideoSubtitlesOptions {
   filePath: string;
   token: string;
@@ -13,6 +21,11 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
   const { t } = useTranslation();
   const [subtitlesList, setSubtitlesList] = useState<SubtitleItem[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>('off');
+  const [audioTracksList, setAudioTracksList] = useState<AudioTrackItem[]>([]);
+  const [activeAudioTrack, setActiveAudioTrack] = useState<number | null>(null);
+  const [subtitleOffset, setSubtitleOffset] = useState<number>(0);
+  const subtitleOffsetRef = useRef<number>(0);
+  subtitleOffsetRef.current = subtitleOffset;
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [currentCueText, setCurrentCueText] = useState<string>('');
   const cuesRef = useRef<SubtitleCue[]>([]);
@@ -41,6 +54,9 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
           if (preferred) {
             setActiveSubtitle(preferred.path);
           }
+        }
+        if (data.audio_tracks && Array.isArray(data.audio_tracks) && data.audio_tracks.length > 0) {
+          setAudioTracksList(data.audio_tracks);
         }
       })
       .catch(() => {});
@@ -81,7 +97,8 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
   const syncCueAtTime = useCallback((actualTime: number) => {
     const activeCues = cuesRef.current;
     if (activeCues.length > 0) {
-      const match = activeCues.find(c => actualTime >= c.start && actualTime <= c.end);
+      const adjustedTime = actualTime + subtitleOffsetRef.current;
+      const match = activeCues.find(c => adjustedTime >= c.start && adjustedTime <= c.end);
       setCurrentCueText(match ? match.text : '');
     } else {
       setCurrentCueText('');
@@ -113,6 +130,11 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
     subtitlesList,
     activeSubtitle,
     setActiveSubtitle,
+    audioTracksList,
+    activeAudioTrack,
+    setActiveAudioTrack,
+    subtitleOffset,
+    setSubtitleOffset,
     cues,
     currentCueText,
     syncCueAtTime,

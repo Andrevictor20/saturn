@@ -5,6 +5,7 @@ import { Play, Loader2 } from 'lucide-react';
 import type { FileItem } from './AudioPlayerModal';
 import { VideoControls } from './VideoControls';
 import { VideoSubtitleMenu, type SubtitleItem } from './VideoSubtitleMenu';
+import { VideoAudioMenu } from './VideoAudioMenu';
 import { VideoErrorBanner } from './VideoErrorBanner';
 import { VideoHeaderOverlay } from './VideoHeaderOverlay';
 import { SubtitleOverlay } from './SubtitleOverlay';
@@ -56,6 +57,11 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
     subtitlesList,
     activeSubtitle,
     setActiveSubtitle,
+    audioTracksList,
+    activeAudioTrack,
+    setActiveAudioTrack,
+    subtitleOffset,
+    setSubtitleOffset,
     currentCueText,
     syncCueAtTime,
     handleCustomSubtitleUpload,
@@ -69,8 +75,10 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
 
   const modeParam = isForceTranscode ? '&mode=transcode' : '&mode=copy';
   const seekParam = transcodeSeekTime !== null && transcodeSeekTime > 0 ? `&start=${transcodeSeekTime}` : '';
-  const baseStreamUrl = isTranscodeMode
-    ? `/api/files/stream/transcode?path=${encodeURIComponent(file.path)}${seekParam}${modeParam}`
+  const audioParam = activeAudioTrack !== null ? `&audio=${activeAudioTrack}` : '';
+  const effectiveTranscodeMode = isTranscodeMode || activeAudioTrack !== null;
+  const baseStreamUrl = effectiveTranscodeMode
+    ? `/api/files/stream/transcode?path=${encodeURIComponent(file.path)}${seekParam}${modeParam}${audioParam}`
     : `/api/files/stream?path=${encodeURIComponent(file.path)}`;
   const videoSrc = `${baseStreamUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
 
@@ -222,13 +230,9 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
 
   const toggleMute = () => {
     if (!videoRef.current) return;
-    if (isMuted) {
-      videoRef.current.volume = volume || 0.5;
-      setIsMuted(false);
-    } else {
-      videoRef.current.volume = 0;
-      setIsMuted(true);
-    }
+    const newMuted = !isMuted;
+    videoRef.current.volume = newMuted ? 0 : (volume || 0.5);
+    setIsMuted(newMuted);
   };
 
   const toggleFullscreen = () => {
@@ -279,17 +283,11 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         handleSkip(5);
-      } else if (e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         if (videoRef.current) {
-          const newVol = Math.min(1, videoRef.current.volume + 0.1);
-          videoRef.current.volume = newVol;
-          setVolume(newVol);
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (videoRef.current) {
-          const newVol = Math.max(0, videoRef.current.volume - 0.1);
+          const delta = e.key === 'ArrowUp' ? 0.1 : -0.1;
+          const newVol = Math.max(0, Math.min(1, videoRef.current.volume + delta));
           videoRef.current.volume = newVol;
           setVolume(newVol);
         }
@@ -463,11 +461,18 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
           formatTime={formatVideoTime}
           showControls={showControls}
         >
+          <VideoAudioMenu
+            audioTracksList={audioTracksList}
+            activeAudioTrack={activeAudioTrack}
+            onAudioTrackChange={setActiveAudioTrack}
+          />
           <VideoSubtitleMenu
             subtitlesList={subtitlesList}
             activeSubtitle={activeSubtitle}
             onSubtitleChange={setActiveSubtitle}
             onCustomSubtitleUpload={handleCustomSubtitleUpload}
+            subtitleOffset={subtitleOffset}
+            onSubtitleOffsetChange={setSubtitleOffset}
           />
         </VideoControls>
       </div>

@@ -260,5 +260,10 @@
   "upload_single_success": "Upload de \"{{name}}\" concluído com sucesso!",
   "original_file_not_found": "Arquivo original não encontrado. Por favor, reenvie o arquivo.",
   "upload_cancelled": "Upload cancelado",
-  "upload_page_reloaded": "Página recarregada. Clique em Retomar para continuar o envio."
+  "upload_page_reloaded": "Página recarregada. Clique em Retomar para continuar o envio.",
+  "select_audio_track": "Selecionar faixa de áudio",
+  "audio_default": "Áudio: Padrão",
+  "sub_delay": "Atrasar legenda (-0.5s)",
+  "sub_advance": "Adiantar legenda (+0.5s)",
+  "reset_sub_sync": "Resetar sincronização para 0s"
 }

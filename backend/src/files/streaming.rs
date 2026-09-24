@@ -212,10 +212,17 @@ pub async fn stream_transcode_media(
 
     cmd.arg("-i").arg(&path);
 
-    // Map first video and first audio stream (exclude attachment fonts, cover arts, and extra subtitles)
-    cmd.args(["-map", "0:v:0", "-map", "0:a:0?"]);
+    // Map video stream (first video track)
+    cmd.args(["-map", "0:v:0"]);
 
-    if stream_info.can_copy_video && !force_transcode {
+    // Map audio stream: either selected audio index or first audio track
+    if let Some(audio_idx) = q.audio {
+        cmd.args(["-map", &format!("0:{}?", audio_idx)]);
+    } else {
+        cmd.args(["-map", "0:a:0?"]);
+    }
+
+    if stream_info.can_copy_video && !force_transcode && q.max_height.is_none() {
         cmd.args(["-c:v", "copy"]);
         if stream_info.is_hevc {
             // Chrome and Safari require the hvc1 FourCC tag to route to hardware video decoders
@@ -231,12 +238,16 @@ pub async fn stream_transcode_media(
             "-crf", "25",
             "-threads", "2",
         ]);
+        if let Some(max_h) = q.max_height {
+            cmd.args(["-vf", &format!("scale=-2:min(ih\\,{})", max_h)]);
+        }
     }
 
-    if stream_info.can_copy_audio && !force_transcode {
+    // If an alternative audio track was chosen, transcode to AAC to guarantee stereo downmixing
+    if stream_info.can_copy_audio && !force_transcode && q.audio.is_none() {
         cmd.args(["-c:a", "copy"]);
     } else {
-        // Universal web audio: 2-channel stereo AAC at 48kHz (handles Opus 5.1/7.1 downmixing cleanly)
+        // Universal web audio: 2-channel stereo AAC at 48kHz (handles 5.1/7.1 downmixing cleanly)
         cmd.args(["-c:a", "aac", "-b:a", "192k", "-ac", "2", "-ar", "48000"]);
     }
 
@@ -289,10 +300,12 @@ mod tests {
         assert_eq!(query.start, Some(12.5));
         assert_eq!(query.mode.as_deref(), Some("transcode"));
 
-        let json_copy = r#"{"path":"/media/anime.mkv","mode":"copy"}"#;
+        let json_copy = r#"{"path":"/media/anime.mkv","mode":"copy","audio":2,"max_height":720}"#;
         let query_copy: TranscodeQuery = serde_json::from_str(json_copy).expect("deserialize copy query");
         assert_eq!(query_copy.mode.as_deref(), Some("copy"));
         assert_eq!(query_copy.start, None);
+        assert_eq!(query_copy.audio, Some(2));
+        assert_eq!(query_copy.max_height, Some(720));
     }
 
     #[test]

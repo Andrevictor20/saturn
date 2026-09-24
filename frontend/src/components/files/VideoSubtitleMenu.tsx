@@ -14,6 +14,8 @@ interface VideoSubtitleMenuProps {
   activeSubtitle: string;
   onSubtitleChange: (path: string) => void;
   onCustomSubtitleUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  subtitleOffset?: number;
+  onSubtitleOffsetChange?: (offset: number) => void;
 }
 
 export function VideoSubtitleMenu({
@@ -21,6 +23,8 @@ export function VideoSubtitleMenu({
   activeSubtitle,
   onSubtitleChange,
   onCustomSubtitleUpload,
+  subtitleOffset = 0,
+  onSubtitleOffsetChange,
 }: VideoSubtitleMenuProps) {
   const { t } = useTranslation();
 
@@ -60,6 +64,37 @@ export function VideoSubtitleMenu({
           className="hidden"
         />
       </label>
+
+      {activeSubtitle !== 'off' && onSubtitleOffsetChange && (
+        <div className="flex items-center gap-0.5 border-l border-zinc-700/60 pl-1.5 ml-0.5">
+          <button
+            type="button"
+            onClick={() => onSubtitleOffsetChange(Number((subtitleOffset - 0.5).toFixed(1)))}
+            className="px-1 py-0.5 text-[10px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-700/60 rounded"
+            title={t('files.sub_delay', 'Atrasar legenda (-0.5s)')}
+          >
+            -0.5s
+          </button>
+          {subtitleOffset !== 0 && (
+            <button
+              type="button"
+              onClick={() => onSubtitleOffsetChange(0)}
+              className="px-1 py-0.5 text-[10px] font-mono text-amber-400 hover:underline"
+              title={t('files.reset_sub_sync', 'Resetar sincronização para 0s')}
+            >
+              {subtitleOffset > 0 ? `+${subtitleOffset.toFixed(1)}s` : `${subtitleOffset.toFixed(1)}s`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onSubtitleOffsetChange(Number((subtitleOffset + 0.5).toFixed(1)))}
+            className="px-1 py-0.5 text-[10px] font-mono text-zinc-400 hover:text-white hover:bg-zinc-700/60 rounded"
+            title={t('files.sub_advance', 'Adiantar legenda (+0.5s)')}
+          >
+            +0.5s
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, RwLock};
 use std::collections::HashMap;
 use super::path_utils::sanitize_path;
-use super::types::{DownloadQuery, SubtitleItem, SubtitlesResponse};
+use super::types::{AudioTrackItem, DownloadQuery, SubtitleItem, SubtitlesResponse};
 
 // In-memory LRU-like caches for instantaneous subtitle response (< 0.1ms)
 static SUBTITLE_VTT_CACHE: LazyLock<RwLock<HashMap<String, String>>> =
@@ -37,90 +37,8 @@ fn sanitize_cache_key(key: &str) -> String {
         .collect()
 }
 
-pub fn strip_ass_tags(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    let mut in_tag = false;
-    for c in input.chars() {
-        if c == '{' {
-            in_tag = true;
-        } else if c == '}' {
-            in_tag = false;
-        } else if !in_tag {
-            out.push(c);
-        }
-    }
-    out.replace("\\N", "\n").replace("\\n", "\n")
-}
-
-fn ass_time_to_vtt(time: &str) -> String {
-    // Convert ASS time "0:01:23.45" to WebVTT "00:01:23.450"
-    let parts: Vec<&str> = time.split(':').collect();
-    if parts.len() == 3 {
-        let h: u32 = parts[0].parse().unwrap_or(0);
-        let m: u32 = parts[1].parse().unwrap_or(0);
-        let sec_parts: Vec<&str> = parts[2].split('.').collect();
-        let s: u32 = sec_parts[0].parse().unwrap_or(0);
-        let cs: u32 = sec_parts.get(1).and_then(|cs| cs.parse().ok()).unwrap_or(0);
-        format!("{:02}:{:02}:{:02}.{:03}", h, m, s, cs * 10)
-    } else {
-        time.to_string()
-    }
-}
-
-pub fn srt_or_ass_to_vtt(content: &str) -> String {
-    let mut vtt = String::from("WEBVTT\n\n");
-    let is_ass = content.lines().any(|l| l.starts_with("[Script Info]") || l.starts_with("Dialogue:"));
-
-    if is_ass {
-        let mut count = 1;
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if let Some(rest) = trimmed.strip_prefix("Dialogue:") {
-                let parts: Vec<&str> = rest.splitn(10, ',').collect();
-                if parts.len() >= 10 {
-                    let start = parts[1].trim();
-                    let end = parts[2].trim();
-                    let raw_text = parts[9].trim();
-
-                    let vtt_start = ass_time_to_vtt(start);
-                    let vtt_end = ass_time_to_vtt(end);
-                    let clean_text = strip_ass_tags(raw_text);
-
-                    if !clean_text.is_empty() {
-                        vtt.push_str(&format!("{}\n{} --> {}\n{}\n\n", count, vtt_start, vtt_end, clean_text));
-                        count += 1;
-                    }
-                }
-            }
-        }
-        return vtt;
-    }
-
-    // Standard SRT, VTT, SBV and generic line processing
-    for line in content.lines() {
-        if line.contains("-->") {
-            let vtt_line = line.replace(',', ".");
-            vtt.push_str(&vtt_line);
-            vtt.push('\n');
-        } else if line.contains(',') && line.contains(':') && line.chars().all(|c| c.is_ascii_digit() || c == ':' || c == '.' || c == ',') {
-            // YouTube .sbv format (e.g. 0:01:23.450,0:01:25.780)
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() == 2 {
-                let p1 = if parts[0].matches(':').count() == 1 { format!("00:{}", parts[0]) } else { parts[0].to_string() };
-                let p2 = if parts[1].matches(':').count() == 1 { format!("00:{}", parts[1]) } else { parts[1].to_string() };
-                vtt.push_str(&format!("{} --> {}\n", p1, p2));
-            } else {
-                vtt.push_str(line);
-                vtt.push('\n');
-            }
-        } else {
-            let clean = strip_ass_tags(line);
-            vtt.push_str(&clean);
-            vtt.push('\n');
-        }
-    }
-    vtt
-}
+// Re-export subtitle parser routines from dedicated module
+pub use super::subtitle_parser::{ass_time_to_vtt, decode_subtitle_bytes, srt_or_ass_to_vtt, strip_ass_tags};
 
 fn vtt_response_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
@@ -202,7 +120,7 @@ pub async fn get_subtitle_vtt(Query(q): Query<DownloadQuery>) -> Result<impl Int
             .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let raw_vtt = String::from_utf8_lossy(&output.stdout).to_string();
+        let raw_vtt = decode_subtitle_bytes(&output.stdout);
         let cleaned_vtt = if raw_vtt.contains("WEBVTT") {
             strip_ass_tags(&raw_vtt)
         } else {
@@ -219,11 +137,14 @@ pub async fn get_subtitle_vtt(Query(q): Query<DownloadQuery>) -> Result<impl Int
     }
 
     // 4. Read external subtitle file (.srt, .vtt, .ass)
+    // Uses decode_subtitle_bytes to seamlessly handle Windows-1252, ISO-8859-1, and UTF-16
+    // without failing or corrupting accented Portuguese characters
     let path = sanitize_path(&q.path)?;
     if !path.exists() || path.is_dir() {
         return Err(StatusCode::NOT_FOUND);
     }
-    let content = fs::read_to_string(&path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let raw_bytes = fs::read(&path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let content = decode_subtitle_bytes(&raw_bytes);
     let vtt = if path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) == Some("vtt".to_string()) {
         content
     } else {
@@ -310,16 +231,16 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
     }
 
     let mut duration = None;
+    let mut audio_tracks = Vec::new();
 
-    // 3. Probing internal embedded subtitles (MKV/MP4/WebM) and duration via ffprobe
+    // 3. Probing internal embedded subtitles (MKV/MP4/WebM), audio tracks and duration via ffprobe
     // Use 15s timeout to allow waking up sleeping external hard drives under load
     let ffprobe_result = tokio::time::timeout(
         std::time::Duration::from_secs(15),
         tokio::process::Command::new("ffprobe")
             .args([
                 "-v", "error",
-                "-select_streams", "s",
-                "-show_entries", "format=duration:stream=index,codec_name:stream_tags=language,title",
+                "-show_entries", "format=duration:stream=index,codec_type,codec_name,channels:stream_tags=language,title",
                 "-of", "json",
             ])
             .arg(&video_path)
@@ -339,7 +260,58 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
 
                 if let Some(streams) = json_val.get("streams").and_then(|s| s.as_array()) {
                     for (stream_order, stream) in streams.iter().enumerate() {
+                        let codec_type = stream.get("codec_type").and_then(|t| t.as_str()).unwrap_or("");
                         let codec_name = stream.get("codec_name").and_then(|c| c.as_str()).unwrap_or("").to_lowercase();
+                        let stream_idx = stream.get("index").and_then(|i| i.as_i64()).unwrap_or(stream_order as i64);
+                        let tags = stream.get("tags");
+                        let raw_lang = tags.and_then(|t| t.get("language")).and_then(|l| l.as_str()).unwrap_or("und");
+                        let title = tags.and_then(|t| t.get("title")).and_then(|l| l.as_str()).unwrap_or("");
+                        
+                        let lang_lower = raw_lang.to_lowercase();
+                        let title_lower = title.to_lowercase();
+
+                        if codec_type == "audio" {
+                            let channels = stream.get("channels").and_then(|c| c.as_u64()).unwrap_or(2) as u32;
+                            let channel_desc = if channels >= 8 {
+                                "7.1"
+                            } else if channels >= 6 {
+                                "5.1"
+                            } else if channels == 1 {
+                                "Mono"
+                            } else {
+                                "Stereo"
+                            };
+
+                            let lang_name = if lang_lower.contains("por") || lang_lower.contains("pt") || title_lower.contains("portug") {
+                                "Português"
+                            } else if lang_lower.contains("eng") || lang_lower.contains("en") || title_lower.contains("english") {
+                                "English"
+                            } else if lang_lower.contains("spa") || lang_lower.contains("es") || title_lower.contains("espanol") {
+                                "Español"
+                            } else if lang_lower.contains("jpn") || lang_lower.contains("ja") {
+                                "Japonês"
+                            } else if !title.is_empty() {
+                                title
+                            } else {
+                                "Áudio"
+                            };
+
+                            let label = if !title.is_empty() && title != lang_name {
+                                format!("{} - {} ({})", lang_name, title, channel_desc)
+                            } else {
+                                format!("{} ({})", lang_name, channel_desc)
+                            };
+
+                            audio_tracks.push(AudioTrackItem {
+                                index: stream_idx as usize,
+                                label,
+                                lang: raw_lang.to_string(),
+                                codec: codec_name,
+                                channels,
+                            });
+                            continue;
+                        }
+
                         // Filter out bitmap subtitles (PGS, VobSub, DVB) which fail conversion to WebVTT without OCR
                         let is_text_codec = match codec_name.as_str() {
                             "subrip" | "srt" | "ass" | "ssa" | "webvtt" | "mov_text" | "text" => true,
@@ -348,14 +320,6 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
                         if !is_text_codec && !codec_name.is_empty() {
                             continue;
                         }
-
-                        let stream_idx = stream.get("index").and_then(|i| i.as_i64()).unwrap_or(stream_order as i64);
-                        let tags = stream.get("tags");
-                        let raw_lang = tags.and_then(|t| t.get("language")).and_then(|l| l.as_str()).unwrap_or("und");
-                        let title = tags.and_then(|t| t.get("title")).and_then(|l| l.as_str()).unwrap_or("");
-                        
-                        let lang_lower = raw_lang.to_lowercase();
-                        let title_lower = title.to_lowercase();
 
                         let label = if lang_lower.contains("por") || lang_lower.contains("pt") || title_lower.contains("portug") {
                             if !title.is_empty() {
@@ -416,10 +380,11 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
     let response = SubtitlesResponse {
         subtitles,
         duration,
+        audio_tracks,
     };
 
-    // Cache if subtitles were found or duration was obtained
-    if !response.subtitles.is_empty() || response.duration.is_some() {
+    // Cache if subtitles or audio tracks were found or duration was obtained
+    if !response.subtitles.is_empty() || response.duration.is_some() || !response.audio_tracks.is_empty() {
         if let Ok(mut cache) = SUBTITLES_LIST_CACHE.write() {
             cache.insert(q.path.clone(), response.clone());
         }
