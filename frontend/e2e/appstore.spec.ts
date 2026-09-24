@@ -63,13 +63,7 @@ test.describe('App Store Flow', () => {
   });
 
   test('should display apps in the store catalog', async ({ page }) => {
-    await page.goto('/');
-    const storeLink = page.locator('a[href="/store"]').first();
-    if (await storeLink.isVisible()) {
-      await storeLink.click();
-    } else {
-      await page.goto('/store');
-    }
+    await page.goto('/store');
 
     // Wait for the mock apps to render
     await expect(page.getByText('AdGuard Home').first()).toBeVisible({ timeout: 15000 });
@@ -77,13 +71,7 @@ test.describe('App Store Flow', () => {
   });
 
   test('should open install modal or perform install action', async ({ page }) => {
-    await page.goto('/');
-    const storeLink = page.locator('a[href="/store"]').first();
-    if (await storeLink.isVisible()) {
-      await storeLink.click();
-    } else {
-      await page.goto('/store');
-    }
+    await page.goto('/store');
     
     // Find install button on AdGuard Home card
     const installBtn = page.locator('button').filter({ hasText: /instalar|install/i }).first();

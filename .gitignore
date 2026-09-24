@@ -45,3 +45,4 @@ frontend/*.log
 *.swo
 .DS_Store
 Thumbs.db
+jellyfin-master/

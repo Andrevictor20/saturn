@@ -10,12 +10,13 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// Registrar Service Worker para suporte a PWA
-if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+// Registrar Service Worker para suporte a PWA (apenas em produção)
+if (import.meta.env.PROD && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.debug('SW registration skipped or failed:', err);
     });
   });
 }
+
 

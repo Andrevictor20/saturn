@@ -26,9 +26,13 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:5173',
 
+    /* Bloquear Service Workers em testes E2E para garantir interceptação das rotas mockadas em todos os motores (especialmente WebKit) */
+    serviceWorkers: 'block',
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
+
 
   /* Configure projects for major browsers */
   projects: [
