@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { FileConflictModal } from './FileConflictModal';
 import type { FileItem } from './AudioPlayerModal';
 
 interface TextEditorModalProps {
@@ -101,6 +102,11 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
   const { confirm } = useConfirm();
   const [content, setContent] = useState<string>('');
   const [originalContent, setOriginalContent] = useState<string>('');
+  const [etag, setEtag] = useState<string | null>(null);
+  const [conflictData, setConflictData] = useState<{
+    serverContent: string;
+    serverEtag: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +138,7 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
       .then(data => {
         setContent(data.content || '');
         setOriginalContent(data.content || '');
+        setEtag(data.etag || null);
         setIsLoading(false);
       })
       .catch(err => {
@@ -140,29 +147,99 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
       });
   }, [file.path, t]);
 
-  const handleSave = async () => {
+  const handleSave = async (force: boolean | unknown = false) => {
+    const isForce = force === true;
     setIsSaving(true);
     setError(null);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (etag && !isForce) {
+        headers['If-Match'] = etag;
+      }
+
       const res = await fetch('/api/files/content', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           path: file.path,
           content,
+          etag: isForce ? undefined : (etag || undefined),
+          force: isForce ? true : undefined,
         }),
       });
 
+      if (res.status === 412) {
+        const errJson = await res.json().catch(() => ({}));
+        setConflictData({
+          serverContent: errJson.current_content ?? '',
+          serverEtag: errJson.current_etag ?? '',
+        });
+        setIsSaving(false);
+        return;
+      }
+
       if (!res.ok) throw new Error(t('files.error_saving', 'Erro ao salvar arquivo'));
 
+      const resData = await res.json().catch(() => ({}));
+      if (resData.new_etag || resData.etag) {
+        setEtag(resData.new_etag || resData.etag);
+      }
       setOriginalContent(content);
       setSaveSuccess(true);
+      setConflictData(null);
       setTimeout(() => setSaveSuccess(false), 2500);
       if (onSaved) onSaved();
     } catch (err: any) {
       setError(err.message || t('files.error_saving_changes', 'Erro ao salvar alterações'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResolveReload = () => {
+    if (!conflictData) return;
+    setContent(conflictData.serverContent);
+    setOriginalContent(conflictData.serverContent);
+    setEtag(conflictData.serverEtag);
+    setConflictData(null);
+    toast.success(t('files.reloaded_from_disk', 'Arquivo recarregado do disco'));
+  };
+
+  const handleResolveOverwrite = async () => {
+    setConflictData(null);
+    await handleSave(true);
+  };
+
+  const handleResolveSaveCopy = async () => {
+    if (!conflictData) return;
+    try {
+      const now = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const dotIndex = file.path.lastIndexOf('.');
+      const copyPath = dotIndex !== -1
+        ? `${file.path.slice(0, dotIndex)}.conflict-${timestamp}${file.path.slice(dotIndex)}`
+        : `${file.path}.conflict-${timestamp}`;
+
+      const createRes = await fetch('/api/files/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: copyPath }),
+      });
+      if (!createRes.ok) throw new Error(t('files.failed_create_copy', 'Falha ao criar arquivo de cópia'));
+
+      const writeRes = await fetch('/api/files/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: copyPath, content, force: true }),
+      });
+      if (!writeRes.ok) throw new Error(t('files.failed_save_copy_content', 'Falha ao gravar conteúdo da cópia'));
+
+      toast.success(t('files.copy_saved_success', 'Cópia salva com sucesso!'));
+      setConflictData(null);
+      if (onSaved) onSaved();
+    } catch (err: any) {
+      toast.error(err.message || t('files.error_saving_copy', 'Erro ao salvar cópia'));
     }
   };
 
@@ -447,6 +524,18 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
             )}
           </div>
         </div>
+
+        {conflictData && (
+          <FileConflictModal
+            fileName={file.name}
+            serverContent={conflictData.serverContent}
+            localContent={content}
+            onReload={handleResolveReload}
+            onOverwrite={handleResolveOverwrite}
+            onSaveCopy={handleResolveSaveCopy}
+            onClose={() => setConflictData(null)}
+          />
+        )}
       </div>
     </div>,
     document.body

@@ -112,12 +112,27 @@ pub struct FileContentResponse {
     pub path: String,
     pub content: String,
     pub size: u64,
+    #[serde(default)]
+    pub etag: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateContentRequest {
     pub path: String,
     pub content: String,
+    #[serde(default)]
+    pub etag: Option<String>,
+    #[serde(default)]
+    pub force: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileConflictErrorResponse {
+    pub error: String,
+    pub message: String,
+    pub current_etag: String,
+    pub current_content: String,
+    pub current_size: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
