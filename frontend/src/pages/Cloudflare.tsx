@@ -13,9 +13,11 @@ import { CloudflareMetrics } from '../components/cloudflare/CloudflareMetrics';
 import { CloudflareConfigModal } from '../components/cloudflare/CloudflareConfigModal';
 import { CloudflareRoutesTable } from '../components/cloudflare/CloudflareRoutesTable';
 import { CloudflareAddRouteModal } from '../components/cloudflare/CloudflareAddRouteModal';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function Cloudflare() {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
 
   const [config, setConfig] = useState<CloudflareConfigResponse | null>(null);
   const [tunnelsData, setTunnelsData] = useState<CloudflareTunnelsResponse | null>(null);
@@ -133,7 +135,14 @@ export function Cloudflare() {
   };
 
   const handleDeleteConfig = async () => {
-    if (!window.confirm(t('cloudflare.confirm_delete_config', 'Deseja remover as credenciais salvas do Cloudflare?'))) {
+    const confirmed = await confirm({
+      title: t('cloudflare.delete_config_title', 'Remover Credenciais do Cloudflare'),
+      message: t('cloudflare.confirm_delete_config', 'Deseja remover as credenciais salvas do Cloudflare?'),
+      confirmText: t('common.remove', 'Remover'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) {
       return;
     }
     try {

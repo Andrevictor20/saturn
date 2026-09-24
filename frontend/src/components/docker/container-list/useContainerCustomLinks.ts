@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import type { Container } from './types';
 
 export interface CloudflareRouteItem {
@@ -119,12 +120,12 @@ export function useContainerCustomLinks(
         body: JSON.stringify({ url: newLink })
       });
       if (!res.ok) {
-        alert(`Erro ao salvar link: ${res.status} ${res.statusText}`);
+        toast.error(`Erro ao salvar link: ${res.status} ${res.statusText}`);
       }
       onLinksChanged();
     } catch (err) {
       console.error('Failed to set link', err);
-      alert(`Erro na rede ao tentar salvar link: ${err}`);
+      toast.error(`Erro na rede ao tentar salvar link: ${err}`);
     }
   };
 

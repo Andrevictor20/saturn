@@ -18,6 +18,7 @@ import {
   Globe 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { FileItem } from './AudioPlayerModal';
 
 interface TextEditorModalProps {
@@ -97,6 +98,7 @@ function renderMarkdownToHtml(md: string): string {
 
 export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps) {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const [content, setContent] = useState<string>('');
   const [originalContent, setOriginalContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -164,9 +166,16 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (isDirty) {
-      if (window.confirm(t('files.unsaved_changes_confirm', 'Existem alterações não salvas. Deseja realmente fechar?'))) {
+      const confirmed = await confirm({
+        title: t('files.unsaved_changes_title', 'Alterações não salvas'),
+        message: t('files.unsaved_changes_confirm', 'Existem alterações não salvas. Deseja realmente fechar?'),
+        confirmText: t('common.discard_and_close', 'Descartar e Fechar'),
+        cancelText: t('common.keep_editing', 'Continuar Editando'),
+        isDestructive: true,
+      });
+      if (confirmed) {
         onClose();
       }
     } else {

@@ -21,11 +21,13 @@ import { BackupKpiCards } from '../components/backups/BackupKpiCards';
 import { BackupTable } from '../components/backups/BackupTable';
 import type { BackupItem } from '../components/backups/types';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export type { BackupItem };
 
 export default function Backups() {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [apps, setApps] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<BackupScheduleConfig>({
@@ -222,7 +224,14 @@ export default function Backups() {
   };
 
   const handleDeleteBackup = async (filename: string) => {
-    if (!window.confirm(t('backups.confirm_delete_permanent', { filename, defaultValue: `Deseja realmente excluir permanentemente ${filename}?` }))) return;
+    const confirmed = await confirm({
+      title: t('backups.delete_title', 'Excluir Backup'),
+      message: t('backups.confirm_delete_permanent', { filename, defaultValue: `Deseja realmente excluir permanentemente ${filename}?` }),
+      confirmText: t('common.delete', 'Excluir'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, {
         method: 'DELETE',

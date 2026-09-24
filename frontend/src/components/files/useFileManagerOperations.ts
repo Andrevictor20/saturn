@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { useUploadManager } from '../../contexts/UploadManagerContext';
 import { useTasks } from '../../contexts/InstallContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { FileItem } from '../../types/fileManager';
 
 interface UseFileManagerOperationsProps {
@@ -43,6 +44,7 @@ export function useFileManagerOperations({
   setIsDraggingOver,
 }: UseFileManagerOperationsProps) {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const { enqueueMultipleUploads } = useUploadManager();
   const { startTask } = useTasks();
 
@@ -221,7 +223,14 @@ export function useFileManagerOperations({
   };
 
   const handleEmptyTrash = async () => {
-    if (!window.confirm(t('files.confirm_empty_trash', 'Tem certeza que deseja esvaziar permanentemente toda a lixeira?'))) return;
+    const confirmed = await confirm({
+      title: t('files.empty_trash_title', 'Esvaziar Lixeira'),
+      message: t('files.confirm_empty_trash', 'Tem certeza que deseja esvaziar permanentemente toda a lixeira?'),
+      confirmText: t('common.empty_trash', 'Esvaziar Permanentemente'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     const toastId = toast.loading(t('files.emptying_trash', 'Esvaziando lixeira...'));
     try {
       const res = await fetch('/api/files/trash/empty', { method: 'DELETE' });

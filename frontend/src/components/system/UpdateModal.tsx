@@ -8,6 +8,7 @@ import { parseReleaseNotes } from './releaseNotesParser';
 import { UpdateProgressView, type UpdateTaskState } from './UpdateProgressView';
 import { UpdateReleaseNotesView } from './UpdateReleaseNotesView';
 import { useSystemUpdate } from '../../contexts/SystemUpdateContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export interface SystemUpdateInfo {
   current_version: string;
@@ -43,6 +44,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo, onRefreshInfo }: Upda
     minimize,
     dismissSuccess
   } = useSystemUpdate();
+  const { confirm } = useConfirm();
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,10 +92,19 @@ export function UpdateModal({ isOpen, onClose, updateInfo, onRefreshInfo }: Upda
       return;
     }
 
-    if (!window.confirm(t('system.confirm_update_version', {
-      version: updateInfo?.latest_version,
-      defaultValue: `Deseja iniciar a atualização do Saturn para v${updateInfo?.latest_version}? O download ocorrerá em segundo plano.`
-    }))) {
+    const targetVer = updateInfo?.latest_version || '';
+    const displayVer = targetVer.startsWith('v') ? targetVer : `v${targetVer}`;
+    const confirmed = await confirm({
+      title: t('system.update_modal_title', 'Atualização do Saturn'),
+      message: t('system.confirm_update_version', {
+        version: displayVer,
+        defaultValue: `Deseja iniciar a atualização do Saturn para ${displayVer}? O painel reiniciará em instantes.`
+      }),
+      confirmText: t('system.start_update', 'Iniciar Atualização'),
+      isDestructive: false,
+    });
+
+    if (!confirmed) {
       return;
     }
 

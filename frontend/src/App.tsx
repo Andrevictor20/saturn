@@ -11,6 +11,7 @@ import { SystemUpdateProvider } from './contexts/SystemUpdateContext';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
@@ -84,11 +85,12 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <ThemeProvider defaultTheme="dark" defaultColor="zinc">
-      <SettingsProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-          <InstallProvider>
-          <BrowserRouter>
+      <ConfirmProvider>
+        <SettingsProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+            <InstallProvider>
+            <BrowserRouter>
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -161,6 +163,7 @@ function App() {
         </AuthProvider>
         </QueryClientProvider>
       </SettingsProvider>
+      </ConfirmProvider>
     </ThemeProvider>
   );
 }

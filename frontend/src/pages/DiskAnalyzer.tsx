@@ -22,9 +22,11 @@ import { DiskInsightsTab } from '../components/disk/DiskInsightsTab';
 import { DiskSafetyGuideTab } from '../components/disk/DiskSafetyGuideTab';
 import { DiskSmartSection } from '../components/files/DiskSmartSection';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function DiskAnalyzer() {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUrlPath = searchParams.get('path') || '/';
 
@@ -178,7 +180,14 @@ export function DiskAnalyzer() {
       return;
     }
 
-    if (!window.confirm(t('disk.confirm_move_trash', { name: item.name, defaultValue: `Tem certeza que deseja mover "${item.name}" para a lixeira?` }))) return;
+    const confirmedMove = await confirm({
+      title: t('disk.move_trash_title', 'Mover para Lixeira'),
+      message: t('disk.confirm_move_trash', { name: item.name, defaultValue: `Tem certeza que deseja mover "${item.name}" para a lixeira?` }),
+      confirmText: t('common.move_to_trash', 'Mover para Lixeira'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmedMove) return;
 
     try {
       const res = await fetch('/api/files/trash', {
@@ -196,7 +205,15 @@ export function DiskAnalyzer() {
 
   // 1-Click Docker Prune
   const handleDockerPrune = async () => {
-    if (!window.confirm(t('disk.docker_prune_confirm', 'Deseja executar a limpeza do Docker (remover imagens órfãs, build cache e containers parados)?'))) return;
+    const confirmedPrune = await confirm({
+      title: t('disk.docker_prune_title', 'Limpeza do Docker'),
+      message: t('disk.docker_prune_confirm', 'Deseja executar a limpeza do Docker (remover imagens órfãs, build cache e containers parados)?'),
+      confirmText: t('disk.prune_now', 'Executar Limpeza'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: false,
+    });
+    if (!confirmedPrune) return;
+
     setIsPruningDocker(true);
     try {
       const res = await fetch('/api/docker/images/prune', { method: 'POST' });
@@ -215,7 +232,15 @@ export function DiskAnalyzer() {
 
   // 1-Click Empty System Trash
   const handleEmptyTrash = async () => {
-    if (!window.confirm(t('disk.empty_trash_confirm', 'Tem certeza que deseja esvaziar permanentemente a lixeira do sistema?'))) return;
+    const confirmedEmpty = await confirm({
+      title: t('disk.empty_trash_title', 'Esvaziar Lixeira'),
+      message: t('disk.empty_trash_confirm', 'Tem certeza que deseja esvaziar permanentemente a lixeira do sistema?'),
+      confirmText: t('common.empty_trash', 'Esvaziar Permanentemente'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmedEmpty) return;
+
     setIsCleaningTrash(true);
     try {
       const res = await fetch('/api/files/trash', { method: 'DELETE' });

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, HelpCircle, X } from 'lucide-react';
 
 import { useTranslation } from 'react-i18next';
 
@@ -13,6 +13,7 @@ export interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   isDestructive?: boolean;
+  icon?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -25,9 +26,22 @@ export function ConfirmModal({
   confirmText,
   cancelText,
   isDestructive = true,
+  icon,
   children
 }: ConfirmModalProps) {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const resolvedConfirm = confirmText ?? t('common.confirm', 'Confirmar');
@@ -38,13 +52,14 @@ export function ConfirmModal({
       <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden animate-slide-up relative my-auto max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className={`p-3 rounded-full ${isDestructive ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-saturn-500/15 text-saturn-600 dark:text-saturn-400'}`}>
-              <AlertTriangle className="w-6 h-6" />
+            <div className={`p-3 rounded-2xl shrink-0 ${isDestructive ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-saturn-500/15 text-saturn-600 dark:text-saturn-400'}`}>
+              {icon ? icon : isDestructive ? <AlertTriangle className="w-6 h-6" /> : <HelpCircle className="w-6 h-6" />}
             </div>
             <h3 className="text-lg font-bold text-primary">{title}</h3>
             <button 
               onClick={onClose}
               className="absolute top-4 right-4 p-2 text-secondary hover:text-primary transition-colors rounded-xl hover:bg-accent"
+              aria-label={t('common.close', 'Fechar')}
             >
               <X className="w-5 h-5" />
             </button>

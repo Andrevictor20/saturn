@@ -18,6 +18,7 @@ import { DockerRunTab } from './DockerRunTab';
 import { ComposeEditorTab, type StackOption } from './ComposeEditorTab';
 import { ComposeWizardTab } from './ComposeWizardTab';
 import { useInstall } from '../../contexts/InstallContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export interface ComposeInstallModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function ComposeInstallModal({
   initialEnv
 }: ComposeInstallModalProps) {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const { startInstall } = useInstall();
   const [modalTab, setModalTab] = useState<'wizard' | 'compose' | 'dockerrun'>('compose');
   const [stackName, setStackName] = useState('');
@@ -150,11 +152,18 @@ export function ComposeInstallModal({
     return () => clearTimeout(timer);
   }, [composeYaml, getAuthHeaders]);
 
-  const handleSelectTemplate = (templateId: string) => {
+  const handleSelectTemplate = async (templateId: string) => {
     const tmpl = COMPOSE_TEMPLATES.find((t) => t.id === templateId);
     if (!tmpl) return;
-    if (composeYaml.trim() && !window.confirm(t('compose_modal.overwrite_confirm', 'Substituir o conteúdo atual pelo template selecionado?'))) {
-      return;
+    if (composeYaml.trim()) {
+      const confirmed = await confirm({
+        title: t('compose_modal.overwrite_title', 'Substituir Template'),
+        message: t('compose_modal.overwrite_confirm', 'Substituir o conteúdo atual pelo template selecionado?'),
+        confirmText: t('common.replace', 'Substituir'),
+        cancelText: t('common.cancel', 'Cancelar'),
+        isDestructive: false,
+      });
+      if (!confirmed) return;
     }
     setComposeYaml(tmpl.yaml);
     if (tmpl.env) setEnvContent(tmpl.env);

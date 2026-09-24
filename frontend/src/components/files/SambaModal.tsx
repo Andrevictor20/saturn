@@ -15,6 +15,7 @@ import {
   FolderSymlink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { FileItem } from '../../pages/FileManager';
 
 interface SambaShare {
@@ -43,6 +44,7 @@ interface SambaModalProps {
 
 export function SambaModal({ folder, isOpen, onClose }: SambaModalProps) {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const [status, setStatus] = useState<SambaStatus | null>(null);
   const [shares, setShares] = useState<SambaShare[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,7 +179,14 @@ export function SambaModal({ folder, isOpen, onClose }: SambaModalProps) {
   };
 
   const handleDeleteShare = async (name: string) => {
-    if (!confirm(t('files.samba_confirm_remove', { name, defaultValue: `Deseja realmente remover o compartilhamento '${name}'? Os arquivos não serão deletados.` }))) {
+    const confirmed = await confirm({
+      title: t('files.samba_remove_title', 'Remover Compartilhamento'),
+      message: t('files.samba_confirm_remove', { name, defaultValue: `Deseja realmente remover o compartilhamento '${name}'? Os arquivos não serão deletados.` }),
+      confirmText: t('common.remove', 'Remover'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 

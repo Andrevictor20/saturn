@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import type { HAConfig, HAEntity, HADeviceGroup, MainTabType, DeviceSubFilter } from './types';
 import { groupEntities, groupAllDevices } from './haUtils';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const getAuthHeaders = () => {
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('saturn_token') : null;
@@ -11,6 +12,7 @@ const getAuthHeaders = () => {
 
 export function useHomeAssistant() {
   const { t, i18n } = useTranslation();
+  const { confirm } = useConfirm();
   const [, startTransition] = useTransition();
 
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -90,7 +92,14 @@ export function useHomeAssistant() {
   }, [urlInput, tokenInput, t, fetchConfig]);
 
   const handleDisconnect = useCallback(async () => {
-    if (!window.confirm(t('homeassistant.disconnect_confirm'))) return;
+    const confirmed = await confirm({
+      title: t('homeassistant.disconnect_title', 'Desconectar Home Assistant'),
+      message: t('homeassistant.disconnect_confirm', 'Deseja realmente desconectar o Home Assistant?'),
+      confirmText: t('common.disconnect', 'Desconectar'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch('/api/homeassistant/config', { method: 'DELETE', headers: getAuthHeaders(), credentials: 'include' });
       if (res.ok) {

@@ -17,9 +17,11 @@ import { PiHoleDomainList } from '../components/pihole/PiHoleDomainList';
 import { PiHoleConfigModal } from '../components/pihole/PiHoleConfigModal';
 import { PiHoleControls } from '../components/pihole/PiHoleControls';
 import { PiHoleConnectBanner } from '../components/pihole/PiHoleConnectBanner';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function PiHole() {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
 
   const [config, setConfig] = useState<PiHoleConfig | null>(null);
   const [stats, setStats] = useState<PiHoleStats | null>(null);
@@ -120,7 +122,14 @@ export function PiHole() {
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm(t('pihole.disconnect_confirm'))) {
+    const confirmed = await confirm({
+      title: t('pihole.disconnect_title', 'Desconectar Pi-hole'),
+      message: t('pihole.disconnect_confirm', 'Deseja realmente desconectar a integração com o Pi-hole?'),
+      confirmText: t('common.disconnect', 'Desconectar'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 

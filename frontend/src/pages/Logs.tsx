@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Terminal as TerminalIcon, RefreshCw, AlertTriangle, Copy, CheckCircle2, Download, Maximize2, Minimize2, ArrowDown, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LogsToolbar, type LogSource, type LogLevel } from '../components/logs/LogsToolbar';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 interface LogsResponse {
   logs: string[];
@@ -13,6 +14,7 @@ interface LogsResponse {
 
 export function Logs() {
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +88,14 @@ export function Logs() {
     const confirmMsg = isSaturn
       ? t('logs.clear_confirm_saturn', 'Deseja realmente limpar os registros de log do Saturn?')
       : t('logs.clear_confirm_system', 'Deseja executar a limpeza e compactação de logs?');
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await confirm({
+      title: isSaturn ? t('logs.clear_title_saturn', 'Limpar Logs do Saturn') : t('logs.clear_title_system', 'Limpar Logs do Sistema'),
+      message: confirmMsg,
+      confirmText: t('common.clear', 'Limpar Logs'),
+      cancelText: t('common.cancel', 'Cancelar'),
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     setClearing(true);
     try {
       const token = localStorage.getItem('saturn_token');
