@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, ArrowLeft, Settings, ChevronDown, Package } from 'lucide-react';
+import { Download, ArrowLeft, Settings, ChevronDown, Package, Lock } from 'lucide-react';
 import { CustomInstallModal } from '../components/docker/CustomInstallModal';
 import { AppArchitectureBadge } from '../components/appstore/AppArchitectureBadge';
 import { AppIcon } from '../components/appstore/AppIcon';
 import { useSystemVersionQuery } from '../queries/useSystemVersionQuery';
 import { PortConflictDialog, type PortConflictItem } from '../components/docker/PortConflictDialog';
 import { useInstall } from '../contexts/InstallContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AppStoreItem {
   id: string;
@@ -26,6 +27,7 @@ export function AppDetail() {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [app, setApp] = useState<AppStoreItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
@@ -244,41 +246,48 @@ export function AppDetail() {
           </div>
 
           <div className="flex gap-4 pt-2">
-            <div className="relative">
-              <div className="flex">
-                <button 
-                  onClick={() => handleInstall(false)}
-                  disabled={installing}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-l-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {installing ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  ) : (
-                    <Download className="w-5 h-5" />
-                  )}
-                  {t('store.install_app', 'Instalar')}
-                </button>
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  disabled={installing}
-                  className="px-3 py-3 bg-blue-700 text-white rounded-r-lg hover:bg-blue-800 transition-colors border-l border-blue-500 disabled:opacity-50"
-                >
-                  <ChevronDown className="w-5 h-5" />
-                </button>
+            {!isAdmin ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent/60 border border-border text-xs text-secondary shadow-sm">
+                <Lock className="w-3.5 h-3.5 text-secondary" />
+                <span>{t('store.admin_required_install', 'Apenas administradores podem instalar aplicativos.')}</span>
               </div>
-
-              {isDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden z-10">
+            ) : (
+              <div className="relative">
+                <div className="flex">
                   <button 
-                    onClick={() => { setIsDropdownOpen(false); handleInstall(true); }}
-                    className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
+                    onClick={() => handleInstall(false)}
+                    disabled={installing}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-l-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    <Settings className="w-4 h-4" />
-                    {t('store.install_custom', 'Instalação Personalizada')}
+                    {installing ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <Download className="w-5 h-5" />
+                    )}
+                    {t('store.install_app', 'Instalar')}
+                  </button>
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    disabled={installing}
+                    className="px-3 py-3 bg-blue-700 text-white rounded-r-lg hover:bg-blue-800 transition-colors border-l border-blue-500 disabled:opacity-50"
+                  >
+                    <ChevronDown className="w-5 h-5" />
                   </button>
                 </div>
-              )}
-            </div>
+
+                {isDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden z-10">
+                    <button 
+                      onClick={() => { setIsDropdownOpen(false); handleInstall(true); }}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      {t('store.install_custom', 'Instalação Personalizada')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

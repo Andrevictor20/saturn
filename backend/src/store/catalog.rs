@@ -117,9 +117,19 @@ pub async fn sync_repositories() {
             continue;
         }
 
+        let lower_url = repo.url.to_lowercase();
+        if lower_url.contains("169.254.169.254")
+            || lower_url.contains("metadata.google.internal")
+            || lower_url.contains("metadata.packet.net")
+            || lower_url.contains("100.100.100.200")
+        {
+            warn!("Skipping blocked cloud metadata repository: {}", repo.url);
+            continue;
+        }
+
         info!("Syncing repository: {} ({})", repo.name, repo.url);
 
-        let res = match client.get(&repo.url).send().await {
+        let mut res = match client.get(&repo.url).send().await {
             Ok(r) => r,
             Err(e) => {
                 warn!("Failed to fetch repository {} from {}: {}", repo.name, repo.url, e);
@@ -132,15 +142,40 @@ pub async fn sync_repositories() {
             continue;
         }
 
-        let bytes = match res.bytes().await {
-            Ok(b) => b,
-            Err(e) => {
-                warn!("Failed to read bytes from {}: {}", repo.url, e);
+        const MAX_CATALOG_BYTES: usize = 25 * 1024 * 1024;
+        if let Some(content_length) = res.content_length() {
+            if content_length > MAX_CATALOG_BYTES as u64 {
+                warn!("Repository {} response too large ({} bytes)", repo.name, content_length);
                 continue;
             }
-        };
+        }
 
-        match serde_json::from_slice::<Vec<AppStoreItem>>(&bytes) {
+        let mut bytes_vec = Vec::new();
+        let mut too_large = false;
+        loop {
+            match res.chunk().await {
+                Ok(Some(chunk)) => {
+                    if bytes_vec.len() + chunk.len() > MAX_CATALOG_BYTES {
+                        warn!("Repository {} exceeded maximum size limit of 25MB", repo.name);
+                        too_large = true;
+                        break;
+                    }
+                    bytes_vec.extend_from_slice(&chunk);
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    warn!("Failed to read chunk from {}: {}", repo.url, e);
+                    too_large = true;
+                    break;
+                }
+            }
+        }
+
+        if too_large {
+            continue;
+        }
+
+        match serde_json::from_slice::<Vec<AppStoreItem>>(&bytes_vec) {
             Ok(apps) => {
                 info!("Fetched {} apps from repository {}", apps.len(), repo.name);
                 for mut app in apps {

@@ -67,6 +67,15 @@ pub fn add_repository_to_path(
         return Err("URL must start with http:// or https://".to_string());
     }
 
+    let lower_url = url.to_lowercase();
+    if lower_url.contains("169.254.169.254")
+        || lower_url.contains("metadata.google.internal")
+        || lower_url.contains("metadata.packet.net")
+        || lower_url.contains("100.100.100.200")
+    {
+        return Err("Blocked cloud metadata address (SSRF protection)".to_string());
+    }
+
     let mut repos = get_repositories_from_path(path);
 
     if repos.iter().any(|r| r.url.trim().eq_ignore_ascii_case(&url)) {

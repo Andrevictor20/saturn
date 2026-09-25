@@ -472,7 +472,7 @@ export function TextEditorModal({ file, onClose, onSaved }: TextEditorModalProps
                         data-testid="html-preview-frame"
                         srcDoc={content}
                         title="HTML Live Preview"
-                        sandbox="allow-scripts allow-same-origin"
+                        sandbox="allow-scripts"
                         className="w-full flex-1 border-0 bg-white"
                       />
                     </div>

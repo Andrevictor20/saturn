@@ -328,6 +328,7 @@ export const en = {
     "developer": "Developer",
     "category": "Category",
     "install_app": "Install App",
+    "admin_required_install": "Only administrators can install applications.",
     "uninstall_app": "Uninstall App",
     "app_details": "Application Details",
     "overview": "Overview",

@@ -30,12 +30,14 @@ import {
 import { useSystemVersionQuery } from '../queries/useSystemVersionQuery';
 import { parseAppArchitectures, isArchCompatibleWithHost } from '../utils/architecture';
 import { queryClient } from '../lib/queryClient';
+import { useAuth } from '../contexts/AuthContext';
 
 
 
 export function AppStore() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: queryApps, isLoading: queryLoading } = useStoreAppsQuery();
   const apps = useMemo(() => queryApps || [], [queryApps]);
@@ -193,35 +195,37 @@ export function AppStore() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
-          <button
-            onClick={() => setIsDockerInstallOpen(true)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-saturn-500 hover:bg-saturn-600 text-white shadow-md shadow-saturn-500/20 transition-all active:scale-[0.98]"
-            title={t('docker_install.title')}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>{t('store.install_custom')}</span>
-          </button>
-          
-          <button
-            onClick={() => setIsRepositoriesOpen(true)}
-            className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-card hover:bg-accent border border-border text-secondary hover:text-primary transition-all active:scale-[0.98] shadow-sm"
-            title={t('store.manage_repositories', 'Gerenciar Repositórios')}
-          >
-            <FolderGit2 className="w-3.5 h-3.5 text-saturn-400" />
-            <span className="hidden sm:inline">{t('store.repositories', 'Repositórios')}</span>
-          </button>
+        {isAdmin && (
+          <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+            <button
+              onClick={() => setIsDockerInstallOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-saturn-500 hover:bg-saturn-600 text-white shadow-md shadow-saturn-500/20 transition-all active:scale-[0.98]"
+              title={t('docker_install.title')}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>{t('store.install_custom')}</span>
+            </button>
+            
+            <button
+              onClick={() => setIsRepositoriesOpen(true)}
+              className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-card hover:bg-accent border border-border text-secondary hover:text-primary transition-all active:scale-[0.98] shadow-sm"
+              title={t('store.manage_repositories', 'Gerenciar Repositórios')}
+            >
+              <FolderGit2 className="w-3.5 h-3.5 text-saturn-400" />
+              <span className="hidden sm:inline">{t('store.repositories', 'Repositórios')}</span>
+            </button>
 
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-card hover:bg-accent border border-border text-secondary hover:text-primary transition-all active:scale-[0.98] disabled:opacity-50 shadow-sm"
-            title={t('store.sync_stores')}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-saturn-500' : ''}`} />
-            <span className="hidden sm:inline">{syncing ? t('store.syncing_stores') : t('store.sync_stores')}</span>
-          </button>
-        </div>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-card hover:bg-accent border border-border text-secondary hover:text-primary transition-all active:scale-[0.98] disabled:opacity-50 shadow-sm"
+              title={t('store.sync_stores')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-saturn-500' : ''}`} />
+              <span className="hidden sm:inline">{syncing ? t('store.syncing_stores') : t('store.sync_stores')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <ComposeInstallModal isOpen={isDockerInstallOpen} onClose={() => setIsDockerInstallOpen(false)} />

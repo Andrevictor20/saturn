@@ -71,10 +71,28 @@ pub fn get_jwt_secret() -> &'static [u8] {
         let new_key = key_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>();
         
         let _ = std::fs::create_dir_all(&data_dir);
-        if let Err(e) = std::fs::write(&secret_path, &new_key) {
+        let write_res = {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .mode(0o600)
+                    .open(&secret_path)
+                    .and_then(|mut f| std::io::Write::write_all(&mut f, new_key.as_bytes()))
+            }
+            #[cfg(not(unix))]
+            {
+                std::fs::write(&secret_path, &new_key)
+            }
+        };
+
+        if let Err(e) = write_res {
             tracing::error!("Failed to save JWT secret to {:?}: {}", secret_path, e);
         } else {
-            tracing::info!("Generated new JWT secret and saved to {:?}", secret_path);
+            tracing::info!("Generated new JWT secret and saved to {:?} (mode 0600)", secret_path);
         }
         
         new_key.into_bytes()

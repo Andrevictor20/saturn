@@ -276,9 +276,21 @@ pub async fn login(
         }
     });
 
+    static DUMMY_HASH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let dummy_hash_str = DUMMY_HASH.get_or_init(|| {
+        let salt = SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(b"saturn_timing_mitigation_dummy", &salt)
+            .map(|h| h.to_string())
+            .unwrap_or_default()
+    });
+
     let user = match found_user {
         Some(u) => u,
         None => {
+            if let Ok(dummy) = PasswordHash::new(dummy_hash_str) {
+                let _ = Argon2::default().verify_password(payload.password.as_bytes(), &dummy);
+            }
             record_failed_attempt(&client_ip);
             return Err(StatusCode::UNAUTHORIZED);
         }

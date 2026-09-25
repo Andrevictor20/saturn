@@ -131,6 +131,13 @@ pub async fn public_get_share(AxumPath(token): AxumPath<String>) -> Result<Respo
     }
 
     if share.is_dir {
+        // Enforce maximum directory size to prevent memory exhaustion / DoS (max 300 MB for in-memory zip)
+        const MAX_SHARED_DIR_ZIP_BYTES: u64 = 300 * 1024 * 1024;
+        let total_size = get_dir_size_recursive(&path, None);
+        if total_size > MAX_SHARED_DIR_ZIP_BYTES {
+            return Err(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+
         // If directory, download as zip
         let mut zip_buf = std::io::Cursor::new(Vec::new());
         {
@@ -147,16 +154,24 @@ pub async fn public_get_share(AxumPath(token): AxumPath<String>) -> Result<Respo
                 for entry in fs::read_dir(dir_path)? {
                     let entry = entry?;
                     let path = entry.path();
-                    let name = path.strip_prefix(prefix).unwrap();
+                    let name = match path.strip_prefix(prefix) {
+                        Ok(n) => n,
+                        Err(_) => continue,
+                    };
                     if path.is_dir() {
                         zip.add_directory(name.to_string_lossy(), options)?;
                         add_dir_to_zip(zip, &path, prefix, options)?;
-                    } else {
+                    } else if path.is_file() {
                         zip.start_file(name.to_string_lossy(), options)?;
                         let mut f = File::open(&path)?;
-                        let mut buf = Vec::new();
-                        f.read_to_end(&mut buf)?;
-                        zip.write_all(&buf)?;
+                        let mut chunk = [0u8; 64 * 1024];
+                        loop {
+                            let n = f.read(&mut chunk)?;
+                            if n == 0 {
+                                break;
+                            }
+                            zip.write_all(&chunk[..n])?;
+                        }
                     }
                 }
                 Ok(())

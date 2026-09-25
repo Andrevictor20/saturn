@@ -18,7 +18,15 @@ pub fn spawn_compose_installation_with_env(
 ) {
     let task_id_clone = task_id;
     tokio::spawn(async move {
-        let safe_id = id.replace("..", "").replace('/', "-").replace('\\', "-");
+        let filtered_id: String = id
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect();
+        let safe_id = if filtered_id.is_empty() {
+            "app".to_string()
+        } else {
+            filtered_id
+        };
         let app_dir = format!("data/apps/{}", safe_id);
 
         let is_cancelled = || -> bool {
@@ -115,19 +123,25 @@ pub fn spawn_compose_installation_with_env(
                                     if host_path.starts_with("./")
                                         || (!host_path.starts_with('/') && !host_path.contains('/'))
                                     {
-                                        let full_path = format!(
-                                            "{}/{}",
-                                            app_dir,
-                                            host_path.trim_start_matches("./")
-                                        );
-                                        if fs::create_dir_all(&full_path).is_ok() {
-                                            #[cfg(unix)]
-                                            {
-                                                use std::os::unix::fs::PermissionsExt;
-                                                let _ = fs::set_permissions(
-                                                    &full_path,
-                                                    fs::Permissions::from_mode(0o777),
-                                                );
+                                        let clean_path = host_path.trim_start_matches("./");
+                                        let has_traversal = std::path::Path::new(clean_path)
+                                            .components()
+                                            .any(|c| {
+                                                c == std::path::Component::ParentDir
+                                                    || c == std::path::Component::RootDir
+                                            });
+
+                                        if !has_traversal && !clean_path.is_empty() {
+                                            let full_path = format!("{}/{}", app_dir, clean_path);
+                                            if fs::create_dir_all(&full_path).is_ok() {
+                                                #[cfg(unix)]
+                                                {
+                                                    use std::os::unix::fs::PermissionsExt;
+                                                    let _ = fs::set_permissions(
+                                                        &full_path,
+                                                        fs::Permissions::from_mode(0o755),
+                                                    );
+                                                }
                                             }
                                         }
                                     }

@@ -8,13 +8,21 @@ use super::super::types::{CustomInstallPayload, PortMapping, VolumeMapping};
 #[cfg(unix)]
 pub fn set_permissions_recursive(dir: &std::path::Path) {
     use std::os::unix::fs::PermissionsExt;
-    let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o777));
+    if dir.is_symlink() {
+        return;
+    }
+    let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o755));
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o777));
+            if path.is_symlink() {
+                continue;
+            }
             if path.is_dir() {
+                let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o755));
                 set_permissions_recursive(&path);
+            } else if path.is_file() {
+                let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o644));
             }
         }
     }

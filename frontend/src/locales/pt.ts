@@ -328,6 +328,7 @@ export const pt = {
     "developer": "Desenvolvedor",
     "category": "Categoria",
     "install_app": "Instalar Aplicativo",
+    "admin_required_install": "Apenas administradores podem instalar aplicativos.",
     "uninstall_app": "Desinstalar Aplicativo",
     "app_details": "Detalhes do Aplicativo",
     "overview": "Visão Geral",

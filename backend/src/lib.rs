@@ -161,8 +161,12 @@ pub fn app() -> Router {
             HeaderValue::from_static("max-age=31536000; includeSubDomains"),
         ))
         .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("referrer-policy"),
-            HeaderValue::from_static("strict-origin-when-cross-origin"),
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
         ))
         .fallback_service(
             ServeDir::new("public").not_found_service(ServeFile::new("public/index.html")),
@@ -218,14 +222,14 @@ fn is_allowed_origin(origin_bytes: &[u8], parts: &axum::http::request::Parts) ->
     let origin_host = origin_host_part.split(':').next().unwrap_or(origin_host_part);
 
     // 1. Same-Origin Check (Automatic for Cloudflare Tunnels, Reverse Proxies, Custom Domains)
-    // If the Origin host matches the incoming request's Host or X-Forwarded-Host, it is legitimate traffic.
+    // If the Origin host matches the incoming request's Host header, it is legitimate traffic.
     let check_header = |name: &str| -> Option<&str> {
         parts.headers.get(name).and_then(|v| v.to_str().ok()).map(|h| {
             h.split(':').next().unwrap_or(h)
         })
     };
 
-    if let Some(req_host) = check_header("x-forwarded-host").or_else(|| check_header("host")) {
+    if let Some(req_host) = check_header("host") {
         if !origin_host.is_empty() && origin_host.eq_ignore_ascii_case(req_host) {
             return true;
         }
