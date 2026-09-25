@@ -125,7 +125,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden text-secondary">
+    <div className="min-h-[100dvh] bg-background flex flex-col justify-center py-6 sm:py-12 px-4 sm:px-6 lg:px-8 relative overflow-x-hidden text-secondary">
       {/* Custom Wallpaper Layer with Frosted Glass Contrast Veil */}
       {wallpaperUrl && (
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none" aria-hidden="true">
@@ -154,22 +154,23 @@ export function Login() {
         </div>
       )}
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 animate-fade-in">
+      <div className="w-full max-w-sm sm:max-w-md mx-auto relative z-10 animate-fade-in">
         <div className="flex justify-center">
-          <div className="p-1 rounded-3xl bg-card/90 backdrop-blur-xl border border-border/80 shadow-2xl shadow-saturn-500/10 flex items-center justify-center transform hover:scale-105 transition-transform duration-500">
-            <SaturnLogo size={64} className="rounded-2xl" />
+          <div className="p-1 rounded-2xl sm:rounded-3xl bg-card/90 backdrop-blur-xl border border-border/80 shadow-2xl shadow-saturn-500/10 flex items-center justify-center transform hover:scale-105 transition-transform duration-500">
+            <SaturnLogo size={48} className="rounded-xl sm:hidden" />
+            <SaturnLogo size={64} className="rounded-2xl hidden sm:block" />
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-primary">
+        <h2 className="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold tracking-tight text-primary">
           Saturn
         </h2>
-        <p className="mt-2 text-center text-sm text-secondary">
+        <p className="mt-1 sm:mt-2 text-center text-xs sm:text-sm text-secondary">
           {t('auth.login_subtitle', 'Painel de Controle de Contêineres')}
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 animate-slide-up">
-        <div className="bg-card/90 backdrop-blur-xl py-8 px-4 shadow-2xl sm:rounded-2xl sm:px-10 border border-border/80 hover:shadow-saturn-500/10 transition-shadow duration-500">
+      <div className="mt-5 sm:mt-8 w-full max-w-sm sm:max-w-md mx-auto relative z-10 animate-slide-up">
+        <div className="bg-card/90 backdrop-blur-xl py-6 px-5 sm:py-8 sm:px-10 shadow-2xl rounded-2xl border border-border/80 hover:shadow-saturn-500/10 transition-shadow duration-500">
           {isUpdated && step === 'credentials' && (
             <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3 text-left animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-500 shrink-0 mt-0.5">
@@ -199,12 +200,12 @@ export function Login() {
           )}
 
           {step === 'credentials' ? (
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-primary">
                   {t('auth.username', 'Usuário')}
                 </label>
-                <div className="mt-2 relative">
+                <div className="mt-1.5 sm:mt-2 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-secondary" />
                   </div>
@@ -216,7 +217,7 @@ export function Login() {
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2.5 bg-background border border-border rounded-xl text-primary placeholder:text-secondary/60 focus:outline-none focus:ring-2 focus:ring-saturn-500/50 focus:border-saturn-500 text-sm transition-colors shadow-sm"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-background border border-border rounded-xl text-primary placeholder:text-secondary/60 focus:outline-none focus:ring-2 focus:ring-saturn-500/50 focus:border-saturn-500 text-base sm:text-sm transition-colors shadow-sm"
                     placeholder={t('auth.username', 'Seu usuário')}
                   />
                 </div>
@@ -226,7 +227,7 @@ export function Login() {
                 <label htmlFor="password" className="block text-sm font-medium text-primary">
                   {t('auth.password', 'Senha')}
                 </label>
-                <div className="mt-2 relative">
+                <div className="mt-1.5 sm:mt-2 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="h-5 w-5 text-secondary" />
                   </div>
@@ -238,7 +239,7 @@ export function Login() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-primary placeholder:text-secondary/60 focus:outline-none focus:ring-2 focus:ring-saturn-500/50 focus:border-saturn-500 text-sm transition-colors shadow-sm"
+                    className="block w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-primary placeholder:text-secondary/60 focus:outline-none focus:ring-2 focus:ring-saturn-500/50 focus:border-saturn-500 text-base sm:text-sm transition-colors shadow-sm"
                     placeholder="••••••••"
                   />
                   <button

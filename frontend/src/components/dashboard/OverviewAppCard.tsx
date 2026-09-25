@@ -30,7 +30,7 @@ export const AppCardItem = memo(function AppCardItem({
     return (
       <div
         onClick={() => onSelectGroup(item)}
-        className="group relative bg-card hover:bg-accent/80 border border-border/80 hover:border-saturn-500/50 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5"
+        className="group relative bg-card hover:bg-accent/80 border border-border/80 hover:border-saturn-500/50 rounded-2xl p-3 sm:p-3.5 flex flex-col items-center justify-between text-center transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md active:scale-95 min-h-[125px]"
         title={`${item.name} (${t('dashboard.container_count', { count: item.totalCount })})`}
       >
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
@@ -73,7 +73,7 @@ export const AppCardItem = memo(function AppCardItem({
   return (
     <div
       onClick={() => onOpenApp(webLink, c.id, isRunning)}
-      className="group relative bg-card hover:bg-accent/80 border border-border/80 hover:border-saturn-500/50 rounded-2xl p-3.5 flex flex-col items-center justify-between text-center transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5"
+      className="group relative bg-card hover:bg-accent/80 border border-border/80 hover:border-saturn-500/50 rounded-2xl p-3 sm:p-3.5 flex flex-col items-center justify-between text-center transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md active:scale-95 min-h-[125px]"
       title={`${c.name} (${c.state})`}
     >
       <div className="absolute top-2.5 right-2.5 flex items-center gap-1">

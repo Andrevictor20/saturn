@@ -65,7 +65,7 @@ export function Terminal() {
     <div className={`flex flex-col animate-in fade-in zoom-in-95 duration-300 ${
       isFullscreen 
         ? 'fixed inset-0 z-50 bg-background p-3 sm:p-5 w-screen h-screen' 
-        : 'h-[calc(100vh-7.5rem)] sm:h-[calc(100vh-8.5rem)] w-full'
+        : 'h-[calc(100dvh-8rem)] sm:h-[calc(100vh-8.5rem)] w-full'
     }`}>
       {/* Top Header (only when not in fullscreen) */}
       {!isFullscreen && (

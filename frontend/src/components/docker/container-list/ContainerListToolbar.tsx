@@ -55,17 +55,17 @@ export function ContainerListToolbar({
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-primary">
             {t('containers.title')}
           </h1>
-          <p className="text-secondary text-sm">
+          <p className="text-secondary text-xs sm:text-sm">
             {t('containers.active_count', { count: totalCount, running: runningCount })}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none justify-start sm:justify-end">
           <button
             onClick={onToggleGroupByStack}
             className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -146,14 +146,14 @@ export function ContainerListToolbar({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 bg-card border border-border p-3 rounded-lg shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-4 sm:mb-6 bg-card border border-border p-2.5 sm:p-3 rounded-xl shadow-sm">
         <div className="flex-1">
           <input
             type="text"
             placeholder={t('containers.search_placeholder')}
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-saturn-500/50 transition-all text-primary"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:ring-2 focus:ring-saturn-500/50 transition-all text-primary"
           />
         </div>
         <div className="flex items-center gap-2">

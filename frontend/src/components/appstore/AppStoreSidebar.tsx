@@ -91,7 +91,7 @@ export function AppStoreSidebar({
           placeholder={t('store.search_placeholder')}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 bg-accent/50 border border-border rounded-xl text-xs text-primary placeholder:text-secondary/60 focus:outline-none focus:border-saturn-500/80 transition-all shadow-sm"
+          className="w-full pl-9 pr-3 py-2 bg-accent/50 border border-border rounded-xl text-base sm:text-xs text-primary placeholder:text-secondary/60 focus:outline-none focus:border-saturn-500/80 transition-all shadow-sm"
         />
         {search && (
           <button

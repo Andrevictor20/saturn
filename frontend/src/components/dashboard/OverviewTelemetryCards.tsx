@@ -115,9 +115,9 @@ export function OverviewTelemetryCards({
   const gpuUsageStr = gpuUsageNum.toFixed(1);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 items-stretch">
+    <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 -mx-1 px-1 scrollbar-none sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 sm:gap-4 sm:pb-0 items-stretch">
       {/* 1. CPU & Temp Card */}
-      <div className="relative group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[180px] flex flex-col justify-between overflow-hidden">
+      <div className="relative group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[160px] sm:min-h-[180px] flex flex-col justify-between overflow-hidden shrink-0 w-[78vw] max-w-[285px] snap-center sm:w-auto sm:max-w-none sm:shrink">
         {cpuView === 'top5' ? (
           <TopProcessesCardView
             type="cpu"
@@ -179,7 +179,7 @@ export function OverviewTelemetryCards({
       </div>
 
       {/* 2. Memory RAM Card */}
-      <div className="relative group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[180px] flex flex-col justify-between overflow-hidden">
+      <div className="relative group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[160px] sm:min-h-[180px] flex flex-col justify-between overflow-hidden shrink-0 w-[78vw] max-w-[285px] snap-center sm:w-auto sm:max-w-none sm:shrink">
         {ramView === 'top5' ? (
           <TopProcessesCardView
             type="ram"
@@ -241,7 +241,7 @@ export function OverviewTelemetryCards({
       {/* 3. GPU Usage Card */}
       <Link
         to="/metrics"
-        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[180px] flex flex-col justify-between block relative overflow-hidden"
+        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[160px] sm:min-h-[180px] flex flex-col justify-between block relative overflow-hidden shrink-0 w-[78vw] max-w-[285px] snap-center sm:w-auto sm:max-w-none sm:shrink"
       >
         <div className="space-y-1">
           <div className="flex items-center justify-between text-secondary">
@@ -297,7 +297,7 @@ export function OverviewTelemetryCards({
       {/* 4. Storage Multi-Drive Card (Cleaned & De-duplicated) */}
       <Link
         to="/disk-analyzer"
-        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[180px] flex flex-col justify-between relative overflow-hidden"
+        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[160px] sm:min-h-[180px] flex flex-col justify-between relative overflow-hidden shrink-0 w-[78vw] max-w-[285px] snap-center sm:w-auto sm:max-w-none sm:shrink"
         title={t('dashboard.view_disk_analyzer', 'Ver Analisador de Disco')}
       >
         <div className="flex items-center justify-between text-secondary mb-2">
@@ -401,7 +401,7 @@ export function OverviewTelemetryCards({
       {/* 5. Network & Containers Card */}
       <Link
         to="/metrics"
-        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[180px] flex flex-col justify-between block relative overflow-hidden"
+        className="group bg-card/60 backdrop-blur-3xl saturate-[190%] hover:bg-accent/70 border border-border/80 hover:border-saturn-500/40 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-sm hover:shadow-md h-full min-h-[160px] sm:min-h-[180px] flex flex-col justify-between block relative overflow-hidden shrink-0 w-[78vw] max-w-[285px] snap-center sm:w-auto sm:max-w-none sm:shrink"
       >
         <div className="space-y-1">
           <div className="flex items-center justify-between text-secondary">

@@ -20,6 +20,7 @@ import { SaturnLogo } from '../ui/SaturnLogo';
 import { UserAvatar } from '../ui/UserAvatar';
 import { MobilePreferencesDropdown, COLOR_THEMES_LIST } from './MobilePreferencesDropdown';
 import { SidebarNav } from './SidebarNav';
+import { MobileBottomNav } from './MobileBottomNav';
 
 function CustomDropdown({ icon: Icon, value, options, onChange, label }: { icon: any; value: string; options: { value: string; label: React.ReactNode }[]; onChange: (val: string) => void; label?: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -242,10 +243,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div key={location.pathname} className={`relative z-10 flex-1 overflow-x-hidden animate-fade-in w-full min-w-0 ${location.pathname === '/files' ? 'p-2 sm:p-3.5 lg:p-4 flex flex-col' : 'p-3.5 sm:p-6 lg:p-8'}`}>
+        <div key={location.pathname} className={`relative z-10 flex-1 overflow-x-hidden animate-fade-in w-full min-w-0 ${location.pathname === '/files' ? 'p-2 sm:p-3.5 lg:p-4 pb-20 sm:pb-4 flex flex-col' : 'p-3.5 sm:p-6 lg:p-8 pb-24 sm:pb-8'}`}>
           {children}
         </div>
       </main>
+
+      <MobileBottomNav onOpenMenu={() => setIsMobileMenuOpen(true)} />
 
       <InstallProgressModal />
       <BatchUpdateFloatingBar />

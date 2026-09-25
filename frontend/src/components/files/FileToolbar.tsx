@@ -199,7 +199,7 @@ export const FileToolbar: React.FC<FileToolbarProps> = ({
               {/* Disk Space Analyzer Button */}
               <Link
                 to={`/disk-analyzer?path=${encodeURIComponent(currentPath)}`}
-                className="p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-violet-600 dark:hover:text-violet-400 hover:bg-accent transition-colors shadow-sm"
+                className="hidden sm:flex items-center justify-center p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-violet-600 dark:hover:text-violet-400 hover:bg-accent transition-colors shadow-sm"
                 title={t('files.disk_analyzer_title', 'Analisador de Espaço em Disco')}
               >
                 <PieChart className="w-4 h-4" />
@@ -209,7 +209,7 @@ export const FileToolbar: React.FC<FileToolbarProps> = ({
               {isAdmin && (
                 <Link
                   to={`/terminal?cwd=${encodeURIComponent(currentPath)}`}
-                  className="p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-accent transition-colors shadow-sm"
+                  className="hidden sm:flex items-center justify-center p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-accent transition-colors shadow-sm"
                   title={t('files.open_terminal_here', 'Abrir Terminal Aqui')}
                 >
                   <Terminal className="w-4 h-4" />
@@ -220,7 +220,7 @@ export const FileToolbar: React.FC<FileToolbarProps> = ({
               {onOpenSamba && (
                 <button
                   onClick={onOpenSamba}
-                  className="p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-saturn-500 hover:bg-accent transition-colors shadow-sm"
+                  className="hidden sm:flex items-center justify-center p-2 rounded-xl border border-border/80 bg-card text-slate-700 dark:text-secondary hover:text-saturn-500 hover:bg-accent transition-colors shadow-sm"
                   title={t('files.samba_network_sharing', 'Compartilhamento de Rede Samba (SMB)')}
                 >
                   <Network className="w-4 h-4" />

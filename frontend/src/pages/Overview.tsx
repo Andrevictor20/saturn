@@ -175,18 +175,19 @@ export function Overview() {
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-150">
       {/* Hero Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-card/85 backdrop-blur-2xl border border-border/80 rounded-3xl p-5 sm:p-6 shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 bg-card/85 backdrop-blur-2xl border border-border/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm">
         {/* Left: Welcome Greeting & Live Clock */}
         <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <SaturnLogo size={30} className="rounded-xl shrink-0" />
-            <h1 className="text-xl sm:text-2xl font-extrabold text-primary tracking-tight">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            <SaturnLogo size={26} className="rounded-xl shrink-0 sm:hidden" />
+            <SaturnLogo size={30} className="rounded-xl shrink-0 hidden sm:block" />
+            <h1 className="text-lg sm:text-2xl font-extrabold text-primary tracking-tight">
               {t('dashboard.welcome', 'Boas-vindas')}
             </h1>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono font-semibold bg-accent/60 border border-border text-primary shadow-inner">
-              <Clock className="w-4 h-4 text-saturn-500" />
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-mono font-semibold bg-accent/60 border border-border text-primary shadow-inner">
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-saturn-500" />
               <span className="tracking-tight">{formattedTime}</span>
-              <span className="text-xs text-secondary font-normal">({timezoneOffsetStr})</span>
+              <span className="text-[10px] sm:text-xs text-secondary font-normal">({timezoneOffsetStr})</span>
               <button
                 type="button"
                 onClick={toggleTimeFormat}
@@ -210,8 +211,8 @@ export function Overview() {
         )}
 
         {/* Right: Quick Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap self-end lg:self-center shrink-0">
-          <Link to="/store" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-saturn-500 hover:bg-saturn-600 active:scale-95 text-white text-xs font-semibold shadow-md shadow-saturn-500/25 transition-all">
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none self-start lg:self-center shrink-0">
+          <Link to="/store" className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl bg-saturn-500 hover:bg-saturn-600 active:scale-95 text-white text-xs font-semibold shadow-md shadow-saturn-500/25 transition-all shrink-0">
             <Plus className="w-3.5 h-3.5" />
             <span>{t('store.install_app', 'Instalar Aplicativo')}</span>
           </Link>
@@ -267,15 +268,15 @@ export function Overview() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
             <div className="flex items-center bg-accent/60 border border-border rounded-xl p-0.5 text-xs">
               {(['all', 'running', 'stacks'] as const).map((filter) => {
-                const labels = { all: `Todos (${groupedItems.length})`, running: 'Ativos', stacks: 'Stacks' };
+                const labels = { all: 'Todos', running: 'Ativos', stacks: 'Stacks' };
                 return (
                   <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
-                    className={`px-2.5 py-1 rounded-lg transition-colors font-medium ${
+                    className={`px-2.5 py-1 rounded-lg transition-colors font-medium text-xs ${
                       activeFilter === filter ? 'bg-saturn-500 text-white shadow-sm' : 'text-secondary hover:text-primary'
                     }`}
                   >
@@ -284,20 +285,20 @@ export function Overview() {
                 );
               })}
             </div>
-            <div className="relative w-full sm:w-48">
+            <div className="relative flex-1 sm:w-48">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none" />
               <input
                 type="text"
                 placeholder="Filtrar apps..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-card border border-border text-xs text-primary placeholder:text-secondary/60 focus:outline-none focus:border-saturn-500 shadow-sm"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-card border border-border text-base sm:text-xs text-primary placeholder:text-secondary/60 focus:outline-none focus:border-saturn-500 shadow-sm"
               />
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5 sm:gap-4">
           {filteredApps.map((item) => (
             <AppCardItem
               key={item.id}
