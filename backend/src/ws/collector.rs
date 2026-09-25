@@ -6,7 +6,7 @@ use sysinfo::{Components, Disks, Networks, System};
 
 use super::alerts::evaluate_and_push_alerts;
 use super::models::{DiskStat, SystemStats};
-use super::{LATEST_STATS, STATS_HISTORY, STATS_TX};
+use super::{LATEST_STATS, STATS_HISTORY, STATS_HISTORY_LONG, STATS_TX};
 
 /// Returns private memory (RSS equivalent) for a PID via statm or VmRSS (bytes).
 pub fn read_private_memory(pid: u32) -> u64 {
@@ -118,6 +118,7 @@ pub async fn run_singleton_stats_collector(docker: Arc<Docker>) {
     let mut disk_poll_ticks = 0u32;
     let mut last_tick_instant = std::time::Instant::now();
     let mut first_tick = true;
+    let mut last_long_sample_ts: u64 = 0;
 
     loop {
         // Adaptive sleep: 2s if active subscribers, 6s if idle (power/CPU conservation)
@@ -420,7 +421,19 @@ pub async fn run_singleton_stats_collector(docker: Arc<Docker>) {
             if hist.len() >= 1800 {
                 hist.pop_front();
             }
-            hist.push_back(hist_entry);
+            hist.push_back(hist_entry.clone());
+        }
+
+        // Retain 72-hour aggregated ring buffer (sample every 3 minutes = max 1440 samples)
+        let now_ms = stats.timestamp;
+        if now_ms >= last_long_sample_ts + 180_000 {
+            last_long_sample_ts = now_ms;
+            if let Ok(mut long_hist) = STATS_HISTORY_LONG.write() {
+                if long_hist.len() >= 1500 {
+                    long_hist.pop_front();
+                }
+                long_hist.push_back(hist_entry);
+            }
         }
 
         if let Ok(j) = serde_json::to_string(&stats) {

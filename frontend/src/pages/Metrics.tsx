@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStats } from '../contexts/StatsContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -7,16 +7,68 @@ import { ProcessMonitor } from '../components/metrics/ProcessMonitor';
 import { AlertsPanel } from '../components/metrics/AlertsPanel';
 
 type TabType = 'overview' | 'system' | 'containers' | 'saturn' | 'processes';
-type TimeRangeType = '1m' | '5m' | '15m' | '30m' | '1h';
+type TimeRangeType = '1m' | '5m' | '15m' | '30m' | '1h' | '12h' | '24h' | '72h';
 
 export function Metrics() {
   const { t } = useTranslation();
   const { stats, history, isConnected } = useStats();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [timeRange, setTimeRange] = useState<TimeRangeType>('5m');
+  const [longHistory, setLongHistory] = useState<typeof history | null>(null);
+
+  const isLongRange = timeRange === '12h' || timeRange === '24h' || timeRange === '72h';
+
+  // Load aggregated long-term metrics from backend when 12h, 24h or 72h range is selected
+  useEffect(() => {
+    if (!isLongRange) {
+      setLongHistory(null);
+      return;
+    }
+
+    let isMounted = true;
+    fetch(`/api/docker/stats/history?range=${timeRange}&limit=300`)
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => {
+        if (!isMounted || !Array.isArray(data) || data.length === 0) return;
+        const points = data.map((item) => {
+          const pointTimestamp = item.timestamp && item.timestamp > 0 ? item.timestamp : Date.now();
+          const d = new Date(pointTimestamp);
+          const day = d.getDate().toString().padStart(2, '0');
+          const month = (d.getMonth() + 1).toString().padStart(2, '0');
+          const hour = d.getHours().toString().padStart(2, '0');
+          const min = d.getMinutes().toString().padStart(2, '0');
+          const timeStr = `${day}/${month} ${hour}:${min}`;
+          return {
+            time: timeStr,
+            timestamp: pointTimestamp,
+            cpu: item.cpu_usage || 0,
+            dockerCpu: item.docker_cpu || 0,
+            saturnCpu: item.saturn_cpu || 0,
+            memory: item.memory_used || 0,
+            dockerMemory: item.docker_memory || 0,
+            saturnMemory: item.saturn_memory || 0,
+            gpu: item.gpu_usage || 0,
+            tx: item.network_tx || 0,
+            rx: item.network_rx || 0,
+            dockerTx: item.docker_tx || 0,
+            dockerRx: item.docker_rx || 0,
+          };
+        });
+        setLongHistory(points);
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [timeRange, isLongRange]);
 
   // Filter history based on selected time range using exact timestamps
   const filteredHistory = useMemo(() => {
+    if (isLongRange && longHistory && longHistory.length > 0) {
+      return longHistory;
+    }
+
     if (!history || history.length === 0) return [];
 
     const durationMap: Record<TimeRangeType, number> = {
@@ -25,6 +77,9 @@ export function Metrics() {
       '15m': 15 * 60 * 1000,
       '30m': 30 * 60 * 1000,
       '1h': 60 * 60 * 1000,
+      '12h': 12 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '72h': 72 * 60 * 60 * 1000,
     };
 
     const durationMs = durationMap[timeRange] || 5 * 60 * 1000;
@@ -34,6 +89,17 @@ export function Metrics() {
     let points = history.filter(p => p.timestamp >= cutoff);
     if (points.length === 0) {
       points = history.slice(-30);
+    }
+
+    if (isLongRange) {
+      points = points.map(p => {
+        const d = new Date(p.timestamp);
+        const day = d.getDate().toString().padStart(2, '0');
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const hour = d.getHours().toString().padStart(2, '0');
+        const min = d.getMinutes().toString().padStart(2, '0');
+        return { ...p, time: `${day}/${month} ${hour}:${min}` };
+      });
     }
 
     // Downsample if there are more than 150 points to maintain high chart rendering performance
@@ -50,7 +116,7 @@ export function Metrics() {
     }
 
     return points;
-  }, [history, timeRange]);
+  }, [history, timeRange, isLongRange, longHistory]);
 
   const formatDecimal = (val: any) => (typeof val === 'number' ? val.toFixed(2) : '0.00');
   const formatPercentage = (val: any) => (typeof val === 'number' ? `${val.toFixed(2)}%` : '0.00%');
@@ -105,7 +171,7 @@ export function Metrics() {
                 <Clock className="w-3.5 h-3.5 text-accent" />
                 <span className="hidden sm:inline">{t('metrics.time_range')}:</span>
               </div>
-              {(['1m', '5m', '15m', '30m', '1h'] as TimeRangeType[]).map((range) => (
+              {(['1m', '5m', '15m', '30m', '1h', '12h', '24h', '72h'] as TimeRangeType[]).map((range) => (
                 <button
                   key={range}
                   onClick={() => setTimeRange(range)}
@@ -245,9 +311,9 @@ export function Metrics() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
                   <Tooltip formatter={formatPercentage} contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }} />
                   
-                  <Area type="monotone" dataKey="cpu" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#8b5cf6" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricCpu)" name="Host CPU" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
-                  <Area type="monotone" dataKey="dockerCpu" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#ec4899" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerCpu)" name="Containers CPU" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
-                  <Area type="monotone" dataKey="saturnCpu" stroke={(activeTab === 'overview' || activeTab === 'saturn') ? "#eab308" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'saturn') ? 1 : 0} fill="url(#metricSaturnCpu)" name="Saturn CPU" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'saturn') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="cpu" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#8b5cf6" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricCpu)" name="Host CPU" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="dockerCpu" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#ec4899" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerCpu)" name="Containers CPU" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="saturnCpu" stroke={(activeTab === 'overview' || activeTab === 'saturn') ? "#eab308" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'saturn') ? 1 : 0} fill="url(#metricSaturnCpu)" name="Saturn CPU" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'saturn') ? undefined : 'none'} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -286,9 +352,9 @@ export function Metrics() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
                   <Tooltip formatter={formatBytes} contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }} />
                   
-                  <Area type="monotone" dataKey="memory" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#10b981" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricMem)" name="Host RAM" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
-                  <Area type="monotone" dataKey="dockerMemory" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#14b8a6" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerMem)" name="Containers RAM" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
-                  <Area type="monotone" dataKey="saturnMemory" stroke={(activeTab === 'overview' || activeTab === 'saturn') ? "#84cc16" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'saturn') ? 1 : 0} fill="url(#metricSaturnMem)" name="Saturn RAM" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'saturn') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="memory" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#10b981" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricMem)" name="Host RAM" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="dockerMemory" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#14b8a6" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerMem)" name="Containers RAM" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
+                  <Area type="monotone" dataKey="saturnMemory" stroke={(activeTab === 'overview' || activeTab === 'saturn') ? "#84cc16" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'saturn') ? 1 : 0} fill="url(#metricSaturnMem)" name="Saturn RAM" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'saturn') ? undefined : 'none'} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -362,12 +428,12 @@ export function Metrics() {
                     <Tooltip formatter={formatSpeed} contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', fontSize: '12px' }} />
                     
                     {/* Host Network (Download RX & Upload TX) */}
-                    <Area type="monotone" dataKey="rx" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#38bdf8" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricRx)" name="Host Download" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
-                    <Area type="monotone" dataKey="tx" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#818cf8" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricTx)" name="Host Upload" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
+                    <Area type="monotone" dataKey="rx" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#38bdf8" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricRx)" name="Host Download" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
+                    <Area type="monotone" dataKey="tx" stroke={(activeTab === 'overview' || activeTab === 'system') ? "#818cf8" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'system') ? 1 : 0} fill="url(#metricTx)" name="Host Upload" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'system') ? undefined : 'none'} />
 
                     {/* Containers Network (Download RX & Upload TX) */}
-                    <Area type="monotone" dataKey="dockerRx" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#fb923c" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerRx)" name="Containers Download" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
-                    <Area type="monotone" dataKey="dockerTx" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#f43f5e" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerTx)" name="Containers Upload" isAnimationActive={false} tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
+                    <Area type="monotone" dataKey="dockerRx" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#fb923c" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerRx)" name="Containers Download" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
+                    <Area type="monotone" dataKey="dockerTx" stroke={(activeTab === 'overview' || activeTab === 'containers') ? "#f43f5e" : "transparent"} fillOpacity={(activeTab === 'overview' || activeTab === 'containers') ? 1 : 0} fill="url(#metricDockerTx)" name="Containers Upload" isAnimationActive={true} animationDuration={750} animationEasing="ease-in-out" tooltipType={(activeTab === 'overview' || activeTab === 'containers') ? undefined : 'none'} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

@@ -11,6 +11,7 @@ vi.mock('recharts', () => {
         data-testid={`area-${props.dataKey}`} 
         data-name={props.name}
         data-stroke={props.stroke}
+        data-animation={props.isAnimationActive ? 'true' : 'false'}
       />
     ),
     XAxis: () => <div data-testid="xaxis" />,
@@ -135,4 +136,40 @@ describe('Metrics Component', () => {
     expect(screen.getByTestId('area-dockerRx').getAttribute('data-stroke')).toBe('transparent');
     expect(screen.getByTestId('area-dockerTx').getAttribute('data-stroke')).toBe('transparent');
   });
+
+  it('renders extended time ranges 12h, 24h, 72h and enables fluid animations on areas', () => {
+    const mockStats = {
+      cpu_usage: 10.0,
+      memory_used: 1024,
+      memory_total: 2048,
+      disks: [],
+      network_tx: 100,
+      network_rx: 200,
+      temperature: 40.0,
+      docker_cpu: 5.0,
+      docker_memory: 512,
+      docker_tx: 50,
+      docker_rx: 100,
+      saturn_cpu: 1.0,
+      saturn_memory: 100,
+    };
+
+    (useStats as any).mockReturnValue({
+      stats: mockStats,
+      history: [{ time: '12:00:00', timestamp: Date.now(), cpu: 10, dockerCpu: 5, saturnCpu: 1, memory: 1024, dockerMemory: 512, saturnMemory: 100, tx: 100, rx: 200, dockerTx: 50, dockerRx: 100 }],
+      isConnected: true
+    });
+
+    render(<MemoryRouter><Metrics /></MemoryRouter>);
+
+    // Verify 12h, 24h and 72h period buttons are rendered
+    expect(screen.getByRole('button', { name: /12 horas/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /24 horas/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /72 horas/i })).toBeTruthy();
+
+    // Verify fluid animation is active (not disabled)
+    const hostRxArea = screen.getByTestId('area-rx');
+    expect(hostRxArea.getAttribute('data-animation')).toBe('true');
+  });
 });
+

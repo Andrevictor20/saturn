@@ -44,4 +44,6 @@ pub struct SystemStats {
 #[derive(Deserialize, Default)]
 pub struct StatsHistoryQuery {
     pub limit: Option<usize>,
+    pub range: Option<String>,
 }
+

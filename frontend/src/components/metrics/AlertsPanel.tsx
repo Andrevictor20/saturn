@@ -14,7 +14,7 @@ export function AlertsPanel() {
       <div className="flex items-center gap-2 px-1">
         <Bell className="w-4 h-4 text-saturn-500" />
         <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">
-          {t('metrics.recent_alerts', 'Avisos & Insights (Últimas 24h)')}
+          {t('metrics.recent_alerts', 'Avisos & Insights (Últimas 48h)')}
         </h3>
       </div>
       
@@ -25,7 +25,7 @@ export function AlertsPanel() {
           </div>
           <div>
             <h4 className="text-sm font-medium text-emerald-400/90">{t('metrics.systems_stable', 'Sistemas Estáveis')}</h4>
-            <p className="text-[11px] text-secondary">{t('metrics.no_anomalies_24h', 'Nenhuma anomalia registrada nas últimas 24h.')}</p>
+            <p className="text-[11px] text-secondary">{t('metrics.no_anomalies_48h', 'Nenhuma anomalia registrada nas últimas 48h.')}</p>
           </div>
         </div>
       ) : (
@@ -39,6 +39,12 @@ export function AlertsPanel() {
               const borderColor = isCritical ? 'border-rose-500/30' : isWarning ? 'border-amber-500/30' : 'border-blue-500/30';
               const textColor = isCritical ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-blue-400';
               const Icon = isCritical ? XCircle : isWarning ? AlertTriangle : Info;
+              const formattedDate = new Date(alert.timestamp).toLocaleString([], {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
 
               return (
                 <div 
@@ -55,7 +61,7 @@ export function AlertsPanel() {
                         {alert.title}
                       </h4>
                       <span className="text-[10px] text-zinc-500 font-mono shrink-0 bg-black/20 px-1.5 py-0.5 rounded-md border border-white/5">
-                        {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formattedDate}
                       </span>
                     </div>
                     <p className="text-xs text-secondary leading-relaxed line-clamp-2">

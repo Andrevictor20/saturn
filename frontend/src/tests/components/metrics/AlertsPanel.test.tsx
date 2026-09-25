@@ -9,17 +9,19 @@ vi.mock('../../../contexts/AlertsContext', () => ({
 import { useAlerts } from '../../../contexts/AlertsContext';
 
 describe('AlertsPanel', () => {
-  it('renders healthy state when no alerts exist', () => {
+  it('renders healthy state when no alerts exist covering 48 hours', () => {
     (useAlerts as any).mockReturnValue({ alerts: [], loading: false, error: null });
     render(<AlertsPanel />);
     expect(screen.getByText('Sistemas Estáveis')).toBeInTheDocument();
-    expect(screen.getByText('Nenhuma anomalia registrada nas últimas 24h.')).toBeInTheDocument();
+    expect(screen.getByText('Nenhuma anomalia registrada nas últimas 48h.')).toBeInTheDocument();
+    expect(screen.getByText('Avisos & Insights (Últimas 48h)')).toBeInTheDocument();
   });
 
-  it('renders warning alert correctly', () => {
+  it('renders warning alert correctly with formatted date and time', () => {
+    const fixedTime = new Date('2026-09-25T14:30:00Z').getTime();
     const mockAlerts = [{
       id: '1',
-      timestamp: Date.now(),
+      timestamp: fixedTime,
       level: 'warning',
       title: 'Alta Temperatura',
       message: 'A temperatura do host atingiu 82°C.',
@@ -29,6 +31,14 @@ describe('AlertsPanel', () => {
     render(<AlertsPanel />);
     expect(screen.getByText('Alta Temperatura')).toBeInTheDocument();
     expect(screen.getByText('A temperatura do host atingiu 82°C.')).toBeInTheDocument();
+    // Verify badge contains both date and time (e.g. 25/09 and 14:30 or equivalent)
+    const expectedDateTime = new Date(fixedTime).toLocaleString([], {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    expect(screen.getByText(expectedDateTime)).toBeInTheDocument();
   });
 
   it('renders critical alert correctly', () => {
@@ -46,3 +56,4 @@ describe('AlertsPanel', () => {
     expect(screen.getByText('O uso de memória RAM está em 95%.')).toBeInTheDocument();
   });
 });
+
