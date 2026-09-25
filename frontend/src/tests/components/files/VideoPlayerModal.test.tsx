@@ -1,6 +1,6 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { VideoPlayerModal } from '../../../components/files/VideoPlayerModal';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('VideoPlayerModal Component', () => {
   const mockFile = {
@@ -24,6 +24,10 @@ describe('VideoPlayerModal Component', () => {
         }),
       })
     ));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders video player modal with MKV title and subtitle options', async () => {
@@ -162,6 +166,39 @@ describe('VideoPlayerModal Component', () => {
     render(<VideoPlayerModal file={mockFile} onClose={vi.fn()} />);
 
     expect(await screen.findByText(/1:00:00/)).toBeTruthy();
+  });
+
+  it('handles stalled watchdog by auto-switching MP4 direct stream to remux/transcode mode', () => {
+    vi.useFakeTimers();
+    const mp4File = { ...mockFile, name: 'stalled.mp4', extension: 'mp4' };
+    render(<VideoPlayerModal file={mp4File} onClose={vi.fn()} />);
+
+    const videoEl = screen.getByTestId('video-element') as HTMLVideoElement;
+    expect(videoEl.getAttribute('src')).toContain('/api/files/stream?path=');
+
+    Object.defineProperty(videoEl, 'readyState', { value: 1, configurable: true });
+    Object.defineProperty(videoEl, 'currentTime', { value: 0, configurable: true });
+
+    act(() => {
+      vi.advanceTimersByTime(6500);
+    });
+
+    expect(videoEl.getAttribute('src')).toContain('/api/files/stream/transcode?path=');
+    vi.useRealTimers();
+  });
+
+  it('correctly sets mode=transcode when forcing transcode from error banner', async () => {
+    const mp4File = { ...mockFile, name: 'stalled.mp4', extension: 'mp4' };
+    render(<VideoPlayerModal file={mp4File} onClose={vi.fn()} />);
+
+    const videoEl = screen.getByTestId('video-element');
+    fireEvent.error(videoEl);
+    fireEvent.error(videoEl);
+
+    const forceBtn = await screen.findByText(/Forçar Transcodificação/i);
+    fireEvent.click(forceBtn);
+
+    expect(videoEl.getAttribute('src')).toContain('&mode=transcode');
   });
 });
 

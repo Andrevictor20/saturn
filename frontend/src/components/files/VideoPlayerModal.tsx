@@ -80,7 +80,7 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
   const modeParam = isForceTranscode ? '&mode=transcode' : '&mode=copy';
   const seekParam = transcodeSeekTime !== null && transcodeSeekTime > 0 ? `&start=${transcodeSeekTime}` : '';
   const audioParam = activeAudioTrack !== null ? `&audio=${activeAudioTrack}` : '';
-  const effectiveTranscodeMode = isTranscodeMode || activeAudioTrack !== null;
+  const effectiveTranscodeMode = isTranscodeMode || isForceTranscode || activeAudioTrack !== null;
   const baseStreamUrl = effectiveTranscodeMode
     ? `/api/files/stream/transcode?path=${encodeURIComponent(file.path)}${seekParam}${modeParam}${audioParam}`
     : `/api/files/stream?path=${encodeURIComponent(file.path)}`;
@@ -118,10 +118,18 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
       watchdogTimerRef.current = setTimeout(() => {
         const video = videoRef.current;
         if (video && video.readyState < 2 && video.currentTime === 0) {
-          setIsBuffering(false);
-          setIsStalledFallback(true);
+          if (!isTranscodeModeRef.current) {
+            // Direct playback stalled (e.g. non-faststart MP4, unsupported codec or bad index)
+            // Auto-fallback silently to fast remux mode first!
+            setIsTranscodeMode(true);
+            setIsBuffering(true);
+          } else {
+            // Remux mode also stalled -> Show user fallback banner with transcode option
+            setIsBuffering(false);
+            setIsStalledFallback(true);
+          }
         }
-      }, 7000);
+      }, 6000);
     }
 
     return () => {
@@ -346,7 +354,11 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
           isForceTranscode={isForceTranscode}
           copied={copied}
           onToggleForceTranscode={() => {
-            setIsForceTranscode(prev => !prev);
+            setIsForceTranscode(prev => {
+              const next = !prev;
+              if (next) setIsTranscodeMode(true);
+              return next;
+            });
             setIsStalledFallback(false);
             setHasError(false);
             setIsBuffering(true);
@@ -364,7 +376,6 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
             preload="metadata"
             autoPlay
             playsInline
-            crossOrigin="anonymous"
             className="w-full h-full object-contain"
           >
             {activeSubtitle !== 'off' && !isCanvasTrack && (() => {
@@ -423,19 +434,16 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
               onEnableTranscode={() => {
                 setHasError(false);
                 setIsStalledFallback(false);
+                setIsTranscodeMode(true);
                 setIsForceTranscode(true);
                 setIsBuffering(true);
-                if (videoRef.current) {
-                  videoRef.current.load();
-                }
               }}
               onRetryRemux={() => {
                 setIsStalledFallback(false);
                 setHasError(false);
+                setIsTranscodeMode(true);
+                setIsForceTranscode(false);
                 setIsBuffering(true);
-                if (videoRef.current) {
-                  videoRef.current.load();
-                }
               }}
               onCopyStreamLink={handleCopyStreamLink}
               copied={copied}

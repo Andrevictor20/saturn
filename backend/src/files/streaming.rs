@@ -75,6 +75,8 @@ pub async fn stream_media(
                 let mut resp_headers = HeaderMap::new();
                 resp_headers.insert(header::CONTENT_RANGE, format!("bytes */{}", total_size).parse().unwrap());
                 resp_headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+                resp_headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+                resp_headers.insert(header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("*"));
                 return Ok((StatusCode::RANGE_NOT_SATISFIABLE, resp_headers).into_response());
             }
 
