@@ -1,17 +1,12 @@
-# Saturn Dashboard v4.1.2
+# Saturn Dashboard v4.1.3
 
-### Novidades, Correções e Melhorias na Versão 4.1.2
+### Novidades, Correções e Melhorias na Versão 4.1.3
 
-### 📈 Histórico Estendido de Métricas (12h, 24h e 72h)
-- **Two-Tier Ring Buffer em Memória:** Implementada arquitetura de séries temporais balanceada no backend Rust, combinando ticks em tempo real de alta resolução (`STATS_HISTORY`, últimas 1h a 2h) com agregação periódica de longo prazo (`STATS_HISTORY_LONG`, até 72 horas em buckets de 3 minutos).
-- **Consultas Leves e Sem Impacto de I/O:** Suporte ao parâmetro `range` (`12h`, `24h`, `72h`) no endpoint `/api/docker/stats/history`, com downsampling uniforme que garante payloads compactos (< 100 KB) e consumo desprezível de memória (< 2 MB).
-- **Navegação Temporal Fluida:** Novos botões de intervalo (12h, 24h, 72h) na aba de Métricas do Sistema com formatação contextual do eixo X (`DD/MM HH:mm`).
+### 🎬 Resiliência de Reprodução & Streaming de Vídeo MP4
+- **Correção Crítica no Roteamento de Transcodificação:** Corrigido bug no `VideoPlayerModal` onde o botão *"Forçar Transcodificação"* não alternava o parâmetro de URL em arquivos `.mp4`, mantendo o fluxo direto quebrado em loop. A rota agora comuta perfeitamente para `/api/files/stream/transcode?mode=transcode`, aplicando decodificação universal H.264 + AAC 48kHz.
+- **Auto-Recuperação Graciosa no Watchdog (Auto-Remux):** Ao detectar buffer estagnado (>6s) na reprodução direta de vídeos MP4 (comum em arquivos sem *faststart* / átomo `moov` no final ou com perfis HEVC não acelerados por hardware), o player transiciona de forma silenciosa e automática para o modo Remux rápido (`mode=copy`). O contêiner é reorganizado pelo FFmpeg em fragmented MP4 em milissegundos e com zero sobrecarga de CPU, iniciando a reprodução imediatamente.
+- **Botão *"Tentar Remux Novamente"* Ativo:** O botão de repetição no banner de travamento agora aciona efetivamente o Remux de contêiner fMP4, permitindo contornar arquivos MP4 com índices de áudio/vídeo corrompidos sem re-codificar o vídeo.
 
-### 🔔 Avisos & Insights Cobrindo 48 Horas
-- **Janela de Retenção de 48 Horas:** O subsistema de alertas do Saturn agora mantém histórico ativo cobrindo 48 horas completas (`ALERT_RETENTION_MS`), descartando automaticamente anomalias expiradas.
-- **Rótulos com Data e Horário Completos:** Badges de alertas agora exibem o timestamp formatado com data e hora local (`DD/MM, HH:mm`), oferecendo rastreabilidade precisa de incidentes de hardware e containers.
-
-### ✨ Gráficos Fluidos com Curvas Catmull-Rom e Animações Dinâmicas
-- **Suavização Contínua $C^1$ na Visão Geral:** Os mini-gráficos (`MiniSparkline`) dos cards de telemetria agora utilizam interpolação Catmull-Rom convertida para Bézier Cúbico, eliminando platôs artificiais e proporcionando transições orgânicas e dinâmicas.
-- **Animações Ativas a 60 FPS:** Habilitada a animação vetorial com easing natural (`ease-in-out`) em todas as séries de CPU, Memória e Tráfego de Rede (Host e Containers) da aba de Métricas.
-
+### 🌐 Sanitização de Cabeçalhos CORS & Compatibilidade Universal
+- **Headers CORS em Códigos HTTP 416:** Adicionados os cabeçalhos `Access-Control-Allow-Origin: *` e `Access-Control-Allow-Headers: *` nas respostas `416 Range Not Satisfiable` do streaming assíncrono em Rust, prevenindo falhas fatais de CORS no navegador durante requisições de range além do fim do arquivo.
+- **Desacoplamento de `crossOrigin="anonymous"`:** Removido o atributo `crossOrigin` do elemento `<video>`, garantindo compatibilidade fluida com cookies de sessão, proxies reversos locais e navegadores estritos tanto em conexões diretas quanto roteadas.
