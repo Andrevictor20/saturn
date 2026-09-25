@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, RwLock};
 use std::collections::HashMap;
 use super::path_utils::sanitize_path;
-use super::types::{AudioTrackItem, DownloadQuery, SubtitleItem, SubtitlesResponse};
+use super::types::{AudioTrackItem, DownloadQuery, RawSubtitleQuery, SubtitleFormat, SubtitleItem, SubtitlesResponse};
 
 // In-memory LRU-like caches for instantaneous subtitle response (< 0.1ms)
 static SUBTITLE_VTT_CACHE: LazyLock<RwLock<HashMap<String, String>>> =
@@ -191,7 +191,7 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
                 if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
                     let ext_lower = ext.to_lowercase();
                     let is_supported_sub = match ext_lower.as_str() {
-                        "srt" | "vtt" | "ass" | "ssa" | "sub" | "sbv" | "smi" => true,
+                        "srt" | "vtt" | "ass" | "ssa" | "sub" | "sbv" | "smi" | "sup" => true,
                         _ => false,
                     };
                     if is_supported_sub {
@@ -217,11 +217,19 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
 
                             let lang = if label.starts_with("Português") { "pt-BR" } else if label.starts_with("English") { "en" } else if label.starts_with("Español") { "es" } else { "und" };
 
+                            let (format, is_bitmap) = match ext_lower.as_str() {
+                                "ass" | "ssa" => (SubtitleFormat::Ass, false),
+                                "sup" => (SubtitleFormat::Pgs, true),
+                                _ => (SubtitleFormat::Vtt, false),
+                            };
+
                             subtitles.push(SubtitleItem {
                                 name,
                                 path: p.to_string_lossy().to_string(),
                                 label: format!("{} (Arquivo)", label),
                                 lang: lang.to_string(),
+                                format,
+                                is_bitmap,
                             });
                         }
                     }
@@ -312,14 +320,25 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
                             continue;
                         }
 
-                        // Filter out bitmap subtitles (PGS, VobSub, DVB) which fail conversion to WebVTT without OCR
+                        // Support text subtitles (SRT, VTT, ASS) and bitmap subtitles (PGS, VobSub)
+                        let is_bitmap = codec_name.contains("pgs") || codec_name.contains("dvd") || codec_name.contains("vob");
+                        let is_ass = codec_name.contains("ass") || codec_name.contains("ssa");
                         let is_text_codec = match codec_name.as_str() {
                             "subrip" | "srt" | "ass" | "ssa" | "webvtt" | "mov_text" | "text" => true,
                             other => other.contains("text") || other.contains("srt") || other.contains("ass"),
                         };
-                        if !is_text_codec && !codec_name.is_empty() {
+
+                        if !is_text_codec && !is_bitmap && !codec_name.is_empty() {
                             continue;
                         }
+
+                        let format = if is_bitmap {
+                            SubtitleFormat::Pgs
+                        } else if is_ass {
+                            SubtitleFormat::Ass
+                        } else {
+                            SubtitleFormat::Vtt
+                        };
 
                         let label = if lang_lower.contains("por") || lang_lower.contains("pt") || title_lower.contains("portug") {
                             if !title.is_empty() {
@@ -370,6 +389,8 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
                             path: format!("internal:{}:{}", stream_idx, q.path),
                             label: format!("{} (Embutida)", label),
                             lang: lang_code.to_string(),
+                            format,
+                            is_bitmap,
                         });
                     }
                 }
@@ -392,3 +413,80 @@ pub async fn get_subtitles(Query(q): Query<DownloadQuery>) -> Result<impl IntoRe
 
     Ok((cors_headers, Json(response)))
 }
+
+pub async fn get_raw_subtitle(Query(q): Query<RawSubtitleQuery>) -> Result<impl IntoResponse, StatusCode> {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
+    headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+    headers.insert(header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("*"));
+    headers.insert(header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, OPTIONS"));
+
+    let is_pgs = q.format.as_deref() == Some("pgs") || q.path.ends_with(".sup");
+    let content_type = if is_pgs {
+        "application/octet-stream"
+    } else {
+        "text/x-ssa; charset=utf-8"
+    };
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+
+    // 1. Internal embedded stream
+    if q.path.starts_with("internal:") {
+        let parts: Vec<&str> = q.path.splitn(3, ':').collect();
+        if parts.len() < 3 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        let stream_idx = parts[1];
+        let original_path = parts[2];
+        let video_path = sanitize_path(original_path)?;
+        if !video_path.exists() || video_path.is_dir() {
+            return Err(StatusCode::NOT_FOUND);
+        }
+
+        let ext = if is_pgs { "sup" } else { "ass" };
+        let cache_dir = get_subtitle_cache_dir();
+        let cache_file_name = format!("{}.{}", sanitize_cache_key(&q.path), ext);
+        let disk_cache_path = cache_dir.join(&cache_file_name);
+
+        if disk_cache_path.exists() {
+            if let Ok(bytes) = fs::read(&disk_cache_path) {
+                return Ok((StatusCode::OK, headers, bytes));
+            }
+        }
+
+        let _guard = EXTRACTION_MUTEX.lock().await;
+
+        if disk_cache_path.exists() {
+            if let Ok(bytes) = fs::read(&disk_cache_path) {
+                return Ok((StatusCode::OK, headers, bytes));
+            }
+        }
+
+        let mut cmd = tokio::process::Command::new("ffmpeg");
+        cmd.args(["-v", "error", "-threads", "1", "-i"]).arg(&video_path);
+
+        if is_pgs {
+            cmd.args(["-map", &format!("0:{}", stream_idx), "-c:s", "copy", "-f", "rawvideo", "-"]);
+        } else {
+            cmd.args(["-map", &format!("0:{}", stream_idx), "-c:s", "copy", "-f", "ass", "-"]);
+        }
+
+        let output = tokio::time::timeout(std::time::Duration::from_secs(45), cmd.output())
+            .await
+            .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let bytes = output.stdout;
+        let _ = fs::write(&disk_cache_path, &bytes);
+        return Ok((StatusCode::OK, headers, bytes));
+    }
+
+    // 2. External file
+    let path = sanitize_path(&q.path)?;
+    if !path.exists() || path.is_dir() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let bytes = fs::read(&path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::OK, headers, bytes))
+}
+

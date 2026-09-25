@@ -7,6 +7,8 @@ export interface SubtitleItem {
   path: string;
   label: string;
   lang: string;
+  format?: 'vtt' | 'ass' | 'pgs' | 'srt';
+  is_bitmap?: boolean;
 }
 
 interface VideoSubtitleMenuProps {
@@ -43,11 +45,14 @@ export function VideoSubtitleMenu({
             ? t('files.no_subtitles_found', 'Sem legendas detectadas (Off)')
             : t('files.subtitles_off', 'Legendas: Off')}
         </option>
-        {subtitlesList.map((sub, idx) => (
-          <option key={idx} value={sub.path} className="bg-zinc-900 text-white">
-            {sub.label} ({sub.name})
-          </option>
-        ))}
+        {subtitlesList.map((sub, idx) => {
+          const badge = sub.format === 'ass' ? ' [ASS]' : sub.format === 'pgs' ? ' [PGS]' : '';
+          return (
+            <option key={idx} value={sub.path} className="bg-zinc-900 text-white">
+              {sub.label}{badge} ({sub.name})
+            </option>
+          );
+        })}
       </select>
       
       <label

@@ -9,6 +9,7 @@ import { VideoAudioMenu } from './VideoAudioMenu';
 import { VideoErrorBanner } from './VideoErrorBanner';
 import { VideoHeaderOverlay } from './VideoHeaderOverlay';
 import { SubtitleOverlay } from './SubtitleOverlay';
+import { CanvasSubtitleRenderer } from './CanvasSubtitleRenderer';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { formatVideoTime } from '../../utils/vttParser';
 
@@ -65,6 +66,9 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
     currentCueText,
     syncCueAtTime,
     handleCustomSubtitleUpload,
+    activeSubtitleItem,
+    canvasSubtitleUrl,
+    isCanvasTrack,
   } = useVideoSubtitles({
     filePath: file.path,
     token,
@@ -363,7 +367,7 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
             crossOrigin="anonymous"
             className="w-full h-full object-contain"
           >
-            {activeSubtitle !== 'off' && (() => {
+            {activeSubtitle !== 'off' && !isCanvasTrack && (() => {
               const currentTrack = subtitlesList.find(s => s.path === activeSubtitle);
               if (!currentTrack) return null;
               const trackSrc = currentTrack.path.startsWith('blob:') 
@@ -380,17 +384,23 @@ export function VideoPlayerModal({ file, onClose }: VideoPlayerModalProps) {
                   default
                   onLoad={(e) => {
                     const trackElem = e.currentTarget as HTMLTrackElement;
-                    if (trackElem.track) {
-                      trackElem.track.mode = 'showing';
-                    }
+                    if (trackElem.track) trackElem.track.mode = 'showing';
                   }}
                 />
               );
             })()}
           </video>
 
-          {/* Dedicated Subtitle Overlay with High Contrast & Perfect Sync */}
-          <SubtitleOverlay currentCue={currentCueText} />
+          {/* Subtitle Overlays: Canvas for ASS/PGS and Native for SRT/VTT */}
+          {!isCanvasTrack && <SubtitleOverlay currentCue={currentCueText} />}
+          {isCanvasTrack && canvasSubtitleUrl && (
+            <CanvasSubtitleRenderer
+              videoRef={videoRef}
+              subtitleUrl={canvasSubtitleUrl}
+              format={activeSubtitleItem?.format || 'ass'}
+              offset={subtitleOffset}
+            />
+          )}
 
           {/* Buffering Spinner */}
           {isBuffering && !hasError && !isStalledFallback && (

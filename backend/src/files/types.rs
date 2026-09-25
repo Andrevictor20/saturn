@@ -135,12 +135,36 @@ pub struct FileConflictErrorResponse {
     pub current_size: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SubtitleFormat {
+    Vtt,
+    Ass,
+    Pgs,
+    Srt,
+}
+
+fn default_subtitle_format() -> SubtitleFormat {
+    SubtitleFormat::Vtt
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleItem {
     pub name: String,
     pub path: String,
     pub label: String,
     pub lang: String,
+    #[serde(default = "default_subtitle_format")]
+    pub format: SubtitleFormat,
+    #[serde(default)]
+    pub is_bitmap: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RawSubtitleQuery {
+    pub path: String,
+    pub format: Option<String>,
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -260,6 +284,7 @@ pub struct TranscodeQuery {
     pub mode: Option<String>,
     pub audio: Option<usize>,
     pub max_height: Option<u32>,
+    pub burn_sub: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

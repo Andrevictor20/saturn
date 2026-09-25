@@ -62,9 +62,17 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
       .catch(() => {});
   }, [filePath, token, onDurationLoaded]);
 
+  const activeSubtitleItem = subtitlesList.find(s => s.path === activeSubtitle) || null;
+  const isCanvasTrack = activeSubtitleItem?.format === 'ass' || activeSubtitleItem?.format === 'pgs';
+  const canvasSubtitleUrl = isCanvasTrack && activeSubtitleItem
+    ? (activeSubtitleItem.path.startsWith('blob:') 
+        ? activeSubtitleItem.path 
+        : `/api/files/subtitles/raw?path=${encodeURIComponent(activeSubtitleItem.path)}&format=${activeSubtitleItem.format || 'ass'}${token ? `&token=${encodeURIComponent(token)}` : ''}`)
+    : '';
+
   // Fetch active subtitle VTT text and parse cues for high-fidelity overlay
   useEffect(() => {
-    if (activeSubtitle === 'off') {
+    if (activeSubtitle === 'off' || isCanvasTrack) {
       setCues([]);
       setCurrentCueText('');
       return;
@@ -92,7 +100,7 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
       })
       .then(text => setCues(parseWebVtt(text)))
       .catch(() => setCues([]));
-  }, [activeSubtitle, subtitlesList, token]);
+  }, [activeSubtitle, subtitlesList, token, isCanvasTrack]);
 
   const syncCueAtTime = useCallback((actualTime: number) => {
     const activeCues = cuesRef.current;
@@ -139,5 +147,8 @@ export function useVideoSubtitles({ filePath, token, onDurationLoaded }: UseVide
     currentCueText,
     syncCueAtTime,
     handleCustomSubtitleUpload,
+    activeSubtitleItem,
+    canvasSubtitleUrl,
+    isCanvasTrack,
   };
 }

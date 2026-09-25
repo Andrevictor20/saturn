@@ -53,6 +53,7 @@ pub fn protected_router() -> Router<AppState> {
         .route("/api/files/thumbnail", get(get_file_thumbnail))
         .route("/api/files/subtitles", get(get_subtitles))
         .route("/api/files/subtitles/vtt", get(get_subtitle_vtt))
+        .route("/api/files/subtitles/raw", get(get_raw_subtitle))
         .route("/api/files/content", get(get_file_content).put(update_file_content))
         .route("/api/files/raw", get(get_raw_file))
         .route("/api/files/extract", post(extract_archive))

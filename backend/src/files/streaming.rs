@@ -222,7 +222,9 @@ pub async fn stream_transcode_media(
         cmd.args(["-map", "0:a:0?"]);
     }
 
-    if stream_info.can_copy_video && !force_transcode && q.max_height.is_none() {
+    let has_burn_sub = q.burn_sub.is_some();
+
+    if stream_info.can_copy_video && !force_transcode && q.max_height.is_none() && !has_burn_sub {
         cmd.args(["-c:v", "copy"]);
         if stream_info.is_hevc {
             // Chrome and Safari require the hvc1 FourCC tag to route to hardware video decoders
@@ -238,7 +240,9 @@ pub async fn stream_transcode_media(
             "-crf", "25",
             "-threads", "2",
         ]);
-        if let Some(max_h) = q.max_height {
+        if let Some(sub_idx) = q.burn_sub {
+            cmd.args(["-filter_complex", &format!("[0:v][0:s:{}]overlay", sub_idx)]);
+        } else if let Some(max_h) = q.max_height {
             cmd.args(["-vf", &format!("scale=-2:min(ih\\,{})", max_h)]);
         }
     }
@@ -306,6 +310,11 @@ mod tests {
         assert_eq!(query_copy.start, None);
         assert_eq!(query_copy.audio, Some(2));
         assert_eq!(query_copy.max_height, Some(720));
+        assert_eq!(query_copy.burn_sub, None);
+
+        let json_burn = r#"{"path":"/media/anime.mkv","burn_sub":3}"#;
+        let query_burn: TranscodeQuery = serde_json::from_str(json_burn).expect("deserialize burn_sub query");
+        assert_eq!(query_burn.burn_sub, Some(3));
     }
 
     #[test]
