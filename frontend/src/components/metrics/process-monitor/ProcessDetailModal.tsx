@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Terminal, X, Box, Monitor, Trash2 } from 'lucide-react';
 import { formatRAM, formatBytes } from '../../../utils/format';
@@ -15,12 +17,24 @@ export function ProcessDetailModal({
   onInitiateKill,
 }: ProcessDetailModalProps) {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!selectedProcess) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedProcess, onClose]);
+
   if (!selectedProcess) return null;
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div 
         className="bg-card border border-border rounded-2xl p-5 sm:p-6 w-full max-w-xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
@@ -75,15 +89,15 @@ export function ProcessDetailModal({
         <div className="grid grid-cols-3 gap-2.5 text-center">
           <div className="bg-background/80 p-3 rounded-xl border border-border/50">
             <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-400 block mb-1">{t('metrics.normalized_cpu', 'CPU Normalizada')}</span>
-            <span className="text-base font-bold text-primary font-mono">{selectedProcess.cpu_usage.toFixed(1)}%</span>
+            <span className="text-base font-bold text-primary font-mono">{(selectedProcess.cpu_usage ?? 0).toFixed(1)}%</span>
           </div>
           <div className="bg-background/80 p-3 rounded-xl border border-border/50">
             <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block mb-1">{t('metrics.real_memory', 'Memória Real (RSS)')}</span>
-            <span className="text-base font-bold text-primary font-mono">{formatRAM(selectedProcess.memory_rss)}</span>
+            <span className="text-base font-bold text-primary font-mono">{formatRAM(selectedProcess.memory_rss ?? 0)}</span>
           </div>
           <div className="bg-background/80 p-3 rounded-xl border border-border/50">
             <span className="text-[10px] uppercase font-bold text-saturn-700 dark:text-saturn-400 block mb-1">{t('metrics.percent_ram', '% da RAM Total')}</span>
-            <span className="text-base font-bold text-primary font-mono">{selectedProcess.memory_percent.toFixed(2)}%</span>
+            <span className="text-base font-bold text-primary font-mono">{(selectedProcess.memory_percent ?? 0).toFixed(2)}%</span>
           </div>
         </div>
 
@@ -99,14 +113,14 @@ export function ProcessDetailModal({
           <div>
             <span className="text-xs font-semibold text-secondary block mb-1">{t('metrics.full_command', 'Linha de Comando Completa (Arguments):')}</span>
             <div className="bg-background p-2.5 rounded-lg border border-border font-mono text-xs text-primary max-h-32 overflow-y-auto break-all select-all">
-              {selectedProcess.cmd.length > 0 ? selectedProcess.cmd.join(' ') : selectedProcess.exe || selectedProcess.name}
+              {Array.isArray(selectedProcess.cmd) && selectedProcess.cmd.length > 0 ? selectedProcess.cmd.join(' ') : selectedProcess.exe || selectedProcess.name}
             </div>
           </div>
 
           {/* Disk I/O */}
           <div className="flex items-center justify-between text-xs text-secondary bg-background p-2.5 rounded-lg border border-border font-mono">
-            <span>{t('metrics.disk_read', 'Leitura em Disco:')} <strong className="text-primary">{formatBytes(selectedProcess.disk_read_bytes)}</strong></span>
-            <span>{t('metrics.disk_write', 'Escrita em Disco:')} <strong className="text-primary">{formatBytes(selectedProcess.disk_written_bytes)}</strong></span>
+            <span>{t('metrics.disk_read', 'Leitura em Disco:')} <strong className="text-primary">{formatBytes(selectedProcess.disk_read_bytes ?? 0)}</strong></span>
+            <span>{t('metrics.disk_write', 'Escrita em Disco:')} <strong className="text-primary">{formatBytes(selectedProcess.disk_written_bytes ?? 0)}</strong></span>
           </div>
         </div>
 
@@ -132,4 +146,6 @@ export function ProcessDetailModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }

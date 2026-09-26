@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ShieldAlert, RefreshCw } from 'lucide-react';
 import type { ProcessInfo } from '../ProcessMonitor';
@@ -20,12 +22,24 @@ export function ProcessKillModal({
   onConfirmKill,
 }: ProcessKillModalProps) {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!killModalProcess) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !killing) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [killModalProcess, killing, onClose]);
+
   if (!killModalProcess) return null;
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={!killing ? onClose : undefined}
+      role="dialog"
+      aria-modal="true"
     >
       <div 
         className="bg-card border border-border rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
@@ -96,4 +110,6 @@ export function ProcessKillModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }

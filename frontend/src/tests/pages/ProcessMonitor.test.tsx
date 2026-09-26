@@ -147,4 +147,37 @@ describe('ProcessMonitor Component', () => {
       expect(screen.getAllByText('/usr/lib/systemd/systemd-journald').length).toBeGreaterThan(0);
     });
   });
+
+  it('opens process details modal when clicking on a process row in the table', async () => {
+    render(<ProcessMonitor />);
+
+    await waitFor(() => {
+      expect(screen.getByText('systemd-journald')).toBeTruthy();
+    });
+
+    const rowName = screen.getByText('systemd-journald');
+    fireEvent.click(rowName);
+
+    await waitFor(() => {
+      expect(screen.getByText('Linha de Comando Completa (Arguments):')).toBeTruthy();
+      expect(screen.getAllByText('PID: 201').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('opens process details modal when clicking on top CPU or top RAM process cards', async () => {
+    render(<ProcessMonitor />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('top-cpu-process-card')).toBeTruthy();
+    });
+
+    const topCpuCard = screen.getByTestId('top-cpu-process-card');
+    fireEvent.click(topCpuCard);
+
+    await waitFor(() => {
+      expect(screen.getByText('Linha de Comando Completa (Arguments):')).toBeTruthy();
+      expect(screen.getAllByText('PID: 101').length).toBeGreaterThan(0);
+    });
+  });
 });
+

@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { Layers, Cpu, HardDrive, Box, Monitor } from 'lucide-react';
 import { formatRAM } from '../../../utils/format';
-import type { ProcessesResponse } from '../ProcessMonitor';
+import type { ProcessInfo, ProcessesResponse } from '../ProcessMonitor';
 
 interface ProcessSummaryCardsProps {
   data: ProcessesResponse | null;
+  onSelectProcess?: (process: ProcessInfo) => void;
 }
 
-export function ProcessSummaryCards({ data }: ProcessSummaryCardsProps) {
+export function ProcessSummaryCards({ data, onSelectProcess }: ProcessSummaryCardsProps) {
   const { t } = useTranslation();
 
   return (
@@ -49,7 +50,28 @@ export function ProcessSummaryCards({ data }: ProcessSummaryCardsProps) {
       </div>
 
       {/* Top CPU Consumer */}
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:border-saturn-500/40 transition-colors">
+      <div 
+        data-testid="top-cpu-process-card"
+        onClick={() => {
+          if (!data?.top_cpu_process || !onSelectProcess) return;
+          const proc = data.processes?.find(p => p.pid === data.top_cpu_process?.pid);
+          if (proc) onSelectProcess(proc);
+        }}
+        className={`bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group transition-all ${
+          data?.top_cpu_process && onSelectProcess 
+            ? 'hover:border-saturn-500/60 cursor-pointer active:scale-[0.99]' 
+            : 'hover:border-saturn-500/40'
+        }`}
+        role={data?.top_cpu_process && onSelectProcess ? 'button' : undefined}
+        tabIndex={data?.top_cpu_process && onSelectProcess ? 0 : undefined}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const proc = data?.processes?.find(p => p.pid === data.top_cpu_process?.pid);
+            if (proc && onSelectProcess) onSelectProcess(proc);
+          }
+        }}
+      >
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-secondary uppercase tracking-wider">{t('metrics.cpu_usage_history')}</span>
           <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -77,7 +99,28 @@ export function ProcessSummaryCards({ data }: ProcessSummaryCardsProps) {
       </div>
 
       {/* Top RAM Consumer */}
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:border-saturn-500/40 transition-colors">
+      <div 
+        data-testid="top-ram-process-card"
+        onClick={() => {
+          if (!data?.top_memory_process || !onSelectProcess) return;
+          const proc = data.processes?.find(p => p.pid === data.top_memory_process?.pid);
+          if (proc) onSelectProcess(proc);
+        }}
+        className={`bg-card border border-border rounded-xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group transition-all ${
+          data?.top_memory_process && onSelectProcess 
+            ? 'hover:border-saturn-500/60 cursor-pointer active:scale-[0.99]' 
+            : 'hover:border-saturn-500/40'
+        }`}
+        role={data?.top_memory_process && onSelectProcess ? 'button' : undefined}
+        tabIndex={data?.top_memory_process && onSelectProcess ? 0 : undefined}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const proc = data?.processes?.find(p => p.pid === data.top_memory_process?.pid);
+            if (proc && onSelectProcess) onSelectProcess(proc);
+          }
+        }}
+      >
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-secondary uppercase tracking-wider">{t('metrics.memory_usage_history')}</span>
           <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">

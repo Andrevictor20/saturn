@@ -247,7 +247,7 @@ export function ProcessMonitor() {
       )}
 
       {/* KPI Bento Cards */}
-      <ProcessSummaryCards data={data} />
+      <ProcessSummaryCards data={data} onSelectProcess={setSelectedProcess} />
 
       {/* Process Table and Toolbar */}
       <ProcessTable
