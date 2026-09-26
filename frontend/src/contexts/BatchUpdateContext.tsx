@@ -30,6 +30,8 @@ export interface BatchUpdateContextType {
   toggleSelectContainer: (id: string) => void;
   selectAllContainers: (ids: string[]) => void;
   deselectAllContainers: () => void;
+  concurrency: number;
+  setConcurrency: (val: number) => void;
   startBatchUpdate: (targetContainers: ContainerLike[]) => Promise<void>;
   retryFailed: (containers: ContainerLike[]) => Promise<void>;
   cancelAll: () => void;
@@ -48,6 +50,23 @@ export const BatchUpdateProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [taskStatuses, setTaskStatuses] = useState<Record<string, ContainerTaskStatus>>({});
   const [logs, setLogs] = useState<string[]>([]);
   const [activeContainerName, setActiveContainerName] = useState<string | null>(null);
+  const [concurrency, setConcurrencyState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('saturn_batch_concurrency');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if ([1, 2, 3, 5].includes(parsed)) return parsed;
+      }
+    } catch {}
+    return 2;
+  });
+
+  const setConcurrency = useCallback((val: number) => {
+    setConcurrencyState(val);
+    try {
+      localStorage.setItem('saturn_batch_concurrency', String(val));
+    } catch {}
+  }, []);
 
   const updatingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -122,19 +141,19 @@ export const BatchUpdateProvider: React.FC<{ children: ReactNode }> = ({ childre
     const session = loadBatchSession();
     if (!session) return;
     toast(t('batch_update_modal.recovering_batch_update', 'Recuperando atualização em lote em andamento...'), { icon: '🔄', duration: 4000 });
-    runUpdateLoop(session.orderedTargets, session.startIndex, session.taskStatuses, session.logs);
-  }, [t]);
+    runUpdateLoop(session.orderedTargets, session.startIndex, session.taskStatuses, session.logs, concurrency);
+  }, [t, concurrency]);
 
   const startBatchUpdate = async (targetContainers: ContainerLike[]) => {
     if (targetContainers.length === 0) return;
-    await runUpdateLoop(targetContainers);
+    await runUpdateLoop(targetContainers, 0, undefined, undefined, concurrency);
   };
 
   const retryFailed = async (containers: ContainerLike[]) => {
     const failedIds = Object.values(taskStatuses).filter(t => t.state === 'error').map(t => t.id);
     const targets = containers.filter(c => failedIds.includes(c.id));
     if (targets.length === 0) return;
-    await runUpdateLoop(targets);
+    await runUpdateLoop(targets, 0, undefined, undefined, concurrency);
   };
 
   const successCount = Object.values(taskStatuses).filter(t => t.state === 'success').length;
@@ -150,6 +169,7 @@ export const BatchUpdateProvider: React.FC<{ children: ReactNode }> = ({ childre
         isUpdating, isCompleted, isModalOpen, taskStatuses, logs, selectedIds,
         activeContainerName, progressPercent, completedTasks, totalTasks,
         successCount, failedCount, cancelledCount,
+        concurrency, setConcurrency,
         openModal, closeModal, minimizeModal, setSelectedIds,
         toggleSelectContainer, selectAllContainers, deselectAllContainers,
         startBatchUpdate, retryFailed, cancelAll, cancelContainer, clear,
@@ -164,6 +184,7 @@ const defaultBatchUpdateContext: BatchUpdateContextType = {
   isUpdating: false, isCompleted: false, isModalOpen: false, taskStatuses: {},
   logs: [], selectedIds: [], activeContainerName: null, progressPercent: 0,
   completedTasks: 0, totalTasks: 0, successCount: 0, failedCount: 0, cancelledCount: 0,
+  concurrency: 2, setConcurrency: () => {},
   openModal: () => {}, closeModal: () => {}, minimizeModal: () => {}, setSelectedIds: () => {},
   toggleSelectContainer: () => {}, selectAllContainers: () => {}, deselectAllContainers: () => {},
   startBatchUpdate: async () => {}, retryFailed: async () => {}, cancelAll: () => {}, cancelContainer: () => {}, clear: () => {},

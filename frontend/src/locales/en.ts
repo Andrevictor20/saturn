@@ -1059,6 +1059,7 @@ export const en = {
     "selected_count": "{{selected}} of {{total}} selected",
     "select_all": "Select All",
     "deselect_all": "Deselect All",
+    "parallelism_label": "Simultaneous downloads:",
     "filter_outdated_only": "Outdated only",
     "filter_all_containers": "All containers",
     "no_containers_selected": "Select at least one container to proceed.",

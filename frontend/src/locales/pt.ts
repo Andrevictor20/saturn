@@ -1059,6 +1059,7 @@ export const pt = {
     "selected_count": "{{selected}} de {{total}} selecionados",
     "select_all": "Selecionar Todos",
     "deselect_all": "Desmarcar Todos",
+    "parallelism_label": "Downloads simultâneos:",
     "filter_outdated_only": "Apenas com atualização pendente",
     "filter_all_containers": "Todos os containers",
     "no_containers_selected": "Selecione ao menos um container para prosseguir.",

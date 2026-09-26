@@ -62,7 +62,8 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
     targetContainers: ContainerLike[],
     startIndex = 0,
     savedStatuses?: Record<string, ContainerTaskStatus>,
-    savedLogs?: string[]
+    savedLogs?: string[],
+    concurrency = 2
   ) => {
     const d = depsRef.current;
     if (d.updatingRef.current) return;
@@ -84,36 +85,44 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
         currentStatuses[c.id] = { id: c.id, name: c.name.replace(/^\//, ''), image: c.image, state: 'pending' };
       });
       d.setTaskStatuses(currentStatuses);
-      d.addLog(t('batch_update_modal.starting_update_log', { count: orderedTargets.length, defaultValue: `Iniciando atualização de ${orderedTargets.length} container(s)...` }));
+      d.addLog(t('batch_update_modal.starting_update_log', { 
+        count: orderedTargets.length, 
+        defaultValue: `Iniciando atualização de ${orderedTargets.length} container(s) [Paralelismo: ${concurrency}x]...` 
+      }));
     } else {
       d.setTaskStatuses(currentStatuses);
       if (savedLogs?.length) d.setLogs(savedLogs);
-      d.addLog(`Retomando lote a partir do container ${startIndex + 1}/${orderedTargets.length}...`);
+      d.addLog(`Retomando lote a partir do container ${startIndex + 1}/${orderedTargets.length} [Paralelismo: ${concurrency}x]...`);
     }
 
     const token = getAuthToken();
     let localSuccess = Object.values(currentStatuses).filter(t => t.state === 'success').length;
     let localFailed = Object.values(currentStatuses).filter(t => t.state === 'error').length;
+    const activeNamesSet = new Set<string>();
 
-    for (let i = startIndex; i < orderedTargets.length; i++) {
-      if (controller.signal.aborted) {
-        for (let j = i; j < orderedTargets.length; j++) {
-          const rem = orderedTargets[j];
-          const remName = rem.name.replace(/^\//, '');
-          d.setTaskStatuses(prev => ({ ...prev, [rem.id]: { ...prev[rem.id], state: 'cancelled', error: t('batch_update_modal.cancelled_by_user', 'Cancelado pelo usuário') } }));
-          d.addLog(t('batch_update_modal.cancelled_by_user_log', { name: remName, defaultValue: `[${remName}] Cancelado pelo usuário.` }));
-        }
-        clearBatchSession();
-        break;
+    const refreshActiveNames = () => {
+      if (activeNamesSet.size === 0) {
+        d.setActiveContainerName(null);
+      } else {
+        const names = Array.from(activeNamesSet);
+        d.setActiveContainerName(names.length > 2 ? `${names.slice(0, 2).join(', ')} (+${names.length - 2})` : names.join(', '));
+      }
+    };
+
+    const processContainer = async (c: ContainerLike): Promise<'success' | 'error' | 'cancelled'> => {
+      const cleanName = c.name.replace(/^\//, '');
+      if (controller.signal.aborted || d.cancelledIdsRef.current.has(c.id)) {
+        d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'cancelled', error: t('batch_update_modal.cancelled_by_user', 'Cancelado pelo usuário') } }));
+        d.addLog(t('batch_update_modal.cancelled_by_user_log', { name: cleanName, defaultValue: `[${cleanName}] Cancelado pelo usuário.` }));
+        return 'cancelled';
       }
 
-      const c = orderedTargets[i];
-      const cleanName = c.name.replace(/^\//, '');
-      if (d.cancelledIdsRef.current.has(c.id)) continue;
-      if (currentStatuses[c.id]?.state === 'success') continue;
+      if (currentStatuses[c.id]?.state === 'success') {
+        return 'success';
+      }
 
-      d.setActiveContainerName(cleanName);
-      saveBatchSession({ orderedTargets, startIndex: i, taskStatuses: currentStatuses, logs: [], activeContainerName: cleanName, timestamp: Date.now() });
+      activeNamesSet.add(cleanName);
+      refreshActiveNames();
 
       currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'pulling' };
       d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'pulling' } }));
@@ -133,7 +142,9 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
               currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'success' };
               d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'success' } }));
               d.addLog(t('batch_update_modal.already_updated_log', { name: cleanName, defaultValue: `[${cleanName}] Já atualizado com sucesso!` }));
-              continue;
+              activeNamesSet.delete(cleanName);
+              refreshActiveNames();
+              return 'success';
             }
           }
         } catch {}
@@ -154,14 +165,18 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
             currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'error', error: errorMessage, details: data?.details || rawText };
             d.setTaskStatuses(prev => ({ ...prev, [c.id]: currentStatuses[c.id] }));
             d.addLog(`[${cleanName}] ${t('common.error', 'ERRO')}: ${errorMessage}`);
-            continue;
+            activeNamesSet.delete(cleanName);
+            refreshActiveNames();
+            return 'error';
           }
           if (data?.status === 'success') {
             localSuccess++;
             currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'success' };
             d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'success' } }));
             d.addLog(`[${cleanName}] ${t('batch_update_runner.success_log', 'Container atualizado com sucesso!')}`);
-            continue;
+            activeNamesSet.delete(cleanName);
+            refreshActiveNames();
+            return 'success';
           }
         }
 
@@ -173,32 +188,95 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
           t,
         });
 
+        activeNamesSet.delete(cleanName);
+        refreshActiveNames();
+
         if (pollResult.wasCancelled) {
           d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'cancelled', error: t('batch_update_runner.cancelled', 'Cancelado') } }));
           d.addLog(`[${cleanName}] ${t('batch_update_runner.cancelled', 'Cancelado')}.`);
+          return 'cancelled';
         } else if (pollResult.success) {
           localSuccess++;
           currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'success' };
           d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'success' } }));
           d.addLog(`[${cleanName}] ${t('batch_update_runner.success_log', 'Atualizado e reiniciado com sucesso!')}`);
+          return 'success';
         } else {
           localFailed++;
           const err = pollResult.error || t('batch_update_runner.update_failed', 'Falha na atualização');
           currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'error', error: err, details: pollResult.details };
           d.setTaskStatuses(prev => ({ ...prev, [c.id]: currentStatuses[c.id] }));
           d.addLog(`[${cleanName}] ERRO: ${err}`);
+          return 'error';
         }
       } catch (err: any) {
+        activeNamesSet.delete(cleanName);
+        refreshActiveNames();
         if (controller.signal.aborted) {
           d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'cancelled', error: t('batch_update_runner.cancelled', 'Cancelado') } }));
           d.addLog(`[${cleanName}] ${t('batch_update_runner.cancelled', 'Cancelado')}.`);
+          return 'cancelled';
         } else {
           localFailed++;
           const errorText = err?.message || t('batch_update_runner.conn_error', 'Erro de conexão');
           d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'error', error: errorText, details: String(err) } }));
           d.addLog(`[${cleanName}] ERRO: ${errorText}`);
+          return 'error';
         }
       }
+    };
+
+    // 1. Process Normal Containers (with configurable concurrency pool)
+    const normalTargetsToProcess = normalContainers.slice(Math.min(startIndex, normalContainers.length));
+    const effectiveConcurrency = Math.max(1, concurrency);
+
+    if (effectiveConcurrency === 1) {
+      for (const c of normalTargetsToProcess) {
+        if (controller.signal.aborted) break;
+        await processContainer(c);
+        saveBatchSession({ orderedTargets, startIndex: orderedTargets.indexOf(c) + 1, taskStatuses: currentStatuses, logs: [], activeContainerName: null, timestamp: Date.now() });
+      }
+    } else {
+      const executing = new Set<Promise<any>>();
+      for (const c of normalTargetsToProcess) {
+        if (controller.signal.aborted) break;
+        const p: Promise<any> = processContainer(c).then(() => {
+          executing.delete(p);
+          saveBatchSession({ orderedTargets, startIndex: orderedTargets.indexOf(c) + 1, taskStatuses: currentStatuses, logs: [], activeContainerName: null, timestamp: Date.now() });
+        });
+        executing.add(p);
+        if (executing.size >= effectiveConcurrency) {
+          await Promise.race(executing);
+        }
+      }
+      await Promise.all(executing);
+    }
+
+    // 2. Process Proxy/Tunnel Containers Sequentially (Safe Network Isolation)
+    if (!controller.signal.aborted && proxyContainers.length > 0) {
+      const proxyStartIndex = Math.max(0, startIndex - normalContainers.length);
+      const proxyTargetsToProcess = proxyContainers.slice(proxyStartIndex);
+      if (proxyTargetsToProcess.length > 0) {
+        d.addLog(t('batch_update_modal.updating_proxies_log', { defaultValue: 'Atualizando proxies e túneis de rede (ordem sequencial de segurança)...' }));
+        for (const c of proxyTargetsToProcess) {
+          if (controller.signal.aborted) break;
+          await processContainer(c);
+          saveBatchSession({ orderedTargets, startIndex: orderedTargets.indexOf(c) + 1, taskStatuses: currentStatuses, logs: [], activeContainerName: null, timestamp: Date.now() });
+        }
+      }
+    }
+
+    // Handle cancel remaining if aborted
+    if (controller.signal.aborted) {
+      orderedTargets.forEach(c => {
+        if (currentStatuses[c.id]?.state === 'pending' || currentStatuses[c.id]?.state === 'pulling') {
+          const remName = c.name.replace(/^\//, '');
+          currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'cancelled', error: t('batch_update_modal.cancelled_by_user', 'Cancelado pelo usuário') };
+          d.addLog(t('batch_update_modal.cancelled_by_user_log', { name: remName, defaultValue: `[${remName}] Cancelado pelo usuário.` }));
+        }
+      });
+      d.setTaskStatuses({ ...currentStatuses });
+      clearBatchSession();
     }
 
     d.updatingRef.current = false;

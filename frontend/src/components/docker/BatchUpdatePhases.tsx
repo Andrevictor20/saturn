@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock, DownloadCloud,
   Terminal, ChevronDown, ChevronUp, Sparkles, Layers, Ban,
-  ArrowUpCircle, Copy, Check, RotateCcw, StopCircle, XCircle,
+  ArrowUpCircle, Copy, Check, RotateCcw, StopCircle, XCircle, Zap,
 } from 'lucide-react';
 import type { ContainerLike } from '../../utils/containerGroups';
 import type { ContainerTaskStatus } from '../../contexts/BatchUpdateContext';
@@ -13,6 +13,8 @@ interface ContainerSelectionPhaseProps {
   updatableContainers: ContainerLike[];
   updatesMap: Record<string, { has_update?: boolean }>;
   selectedIds: string[];
+  concurrency?: number;
+  setConcurrency?: (val: number) => void;
   onToggle: (id: string) => void;
   onSelectAll: () => void;
   onStart: () => void;
@@ -45,6 +47,7 @@ interface ExecutionPhaseProps {
 
 export function ContainerSelectionPhase({
   displayedContainers, updatableContainers, updatesMap, selectedIds,
+  concurrency = 2, setConcurrency,
   onToggle, onSelectAll, onStart, onClose, isSaturnSelf,
 }: ContainerSelectionPhaseProps) {
   const { t } = useTranslation();
@@ -62,6 +65,35 @@ export function ContainerSelectionPhase({
           <span className="text-xs text-slate-700 dark:text-secondary font-mono font-medium">
             {t('batch_update_modal.selected_count', { selected: selectedIds.length, total: updatableContainers.length })}
           </span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl border border-border bg-card/60">
+        <div className="flex items-center space-x-2">
+          <Zap className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-xs text-slate-700 dark:text-secondary font-medium">
+            {t('batch_update_modal.parallelism_label', 'Downloads simultâneos:')}
+          </span>
+        </div>
+        <div className="inline-flex items-center p-0.5 rounded-lg border border-border bg-accent/40" data-testid="batch-concurrency-selector">
+          {[1, 2, 3, 5].map((level) => {
+            const isActive = concurrency === level;
+            return (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setConcurrency?.(level)}
+                aria-pressed={isActive}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                  isActive
+                    ? 'bg-saturn-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-secondary hover:text-primary hover:bg-accent/60'
+                }`}
+              >
+                {level}x
+              </button>
+            );
+          })}
         </div>
       </div>
 
