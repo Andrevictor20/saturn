@@ -277,11 +277,22 @@ pub async fn get_container_update_status(Path(id): Path<String>) -> impl IntoRes
                     || (t.id.len() >= 12 && id.starts_with(&t.id[..12]))
             })
         }) {
-            return (
-                StatusCode::OK,
-                Json(serde_json::to_value(task).unwrap_or_default()),
-            )
-                .into_response();
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            // A finished task older than 120s is considered idle so old states do not mask new update sessions
+            if (task.status == "success" || task.status == "error" || task.status == "cancelled")
+                && now.saturating_sub(task.updated_at) > 120
+            {
+                // Expired finished task -> fall through to idle
+            } else {
+                return (
+                    StatusCode::OK,
+                    Json(serde_json::to_value(task).unwrap_or_default()),
+                )
+                    .into_response();
+            }
         }
     }
 

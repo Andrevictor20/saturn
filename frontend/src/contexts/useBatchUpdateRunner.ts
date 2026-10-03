@@ -137,14 +137,6 @@ export function useBatchUpdateRunner(deps: BatchRunnerDeps) {
             if (activeData?.status === 'pulling' || activeData?.status === 'recreating') {
               skipTrigger = true;
               d.addLog(t('batch_update_modal.synced_existing_log', { name: cleanName, defaultValue: `[${cleanName}] Sincronizado com processo já em execução...` }));
-            } else if (activeData?.status === 'success') {
-              localSuccess++;
-              currentStatuses[c.id] = { ...currentStatuses[c.id], state: 'success' };
-              d.setTaskStatuses(prev => ({ ...prev, [c.id]: { ...prev[c.id], state: 'success' } }));
-              d.addLog(t('batch_update_modal.already_updated_log', { name: cleanName, defaultValue: `[${cleanName}] Já atualizado com sucesso!` }));
-              activeNamesSet.delete(cleanName);
-              refreshActiveNames();
-              return 'success';
             }
           }
         } catch {}

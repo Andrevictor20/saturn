@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 import type { HAConfig, HAEntity, HADeviceGroup, MainTabType, DeviceSubFilter } from './types';
 import { groupEntities, groupAllDevices } from './haUtils';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { getAuthToken } from '../../utils/auth';
 
 const getAuthHeaders = () => {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('saturn_token') : null;
+  const token = getAuthToken();
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 };
 
@@ -84,11 +85,35 @@ export function useHomeAssistant() {
         method: 'POST', headers: getAuthHeaders(), credentials: 'include',
         body: JSON.stringify({ url: urlInput.trim(), token: tokenInput.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) { setConnectError(data.error || t('homeassistant.connection_failed', 'Falha na conexão')); toast.error(data.error || t('homeassistant.connection_failed', 'Falha ao conectar')); }
-      else { toast.success(t('homeassistant.connect_title') + ': ' + t('common.success')); fetchConfig(); }
-    } catch (err: any) { setConnectError(err.message || t('homeassistant.network_error', 'Erro de rede')); toast.error(t('homeassistant.connection_failed', 'Erro de conexão')); }
-    finally { setIsConnecting(false); }
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Empty body or non-JSON response (e.g. 401/403 or HTML gateway error)
+      }
+      if (!res.ok) {
+        let msg = data?.error;
+        if (!msg) {
+          if (res.status === 401) {
+            msg = t('auth.session_expired', 'Sessão expirada. Faça login novamente.');
+          } else if (res.status === 403) {
+            msg = t('auth.admin_required', 'Permissão negada. Apenas administradores podem configurar integrações.');
+          } else {
+            msg = t('homeassistant.connection_failed', 'Falha na conexão');
+          }
+        }
+        setConnectError(msg);
+        toast.error(msg);
+      } else {
+        toast.success(t('homeassistant.connect_title') + ': ' + t('common.success'));
+        fetchConfig();
+      }
+    } catch (err: any) {
+      setConnectError(err.message || t('homeassistant.network_error', 'Erro de rede'));
+      toast.error(t('homeassistant.connection_failed', 'Erro de conexão'));
+    } finally {
+      setIsConnecting(false);
+    }
   }, [urlInput, tokenInput, t, fetchConfig]);
 
   const handleDisconnect = useCallback(async () => {

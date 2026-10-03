@@ -113,3 +113,40 @@ fn test_parse_image_ref_and_digests() {
     assert_eq!(repo, "library/redis");
     assert_eq!(tag, "latest");
 }
+
+#[test]
+fn test_is_local_digest_matching_multi_arch() {
+    use backend::docker::updates::is_local_digest_matching;
+
+    // Direct match with index digest
+    let local = vec!["n8nio/n8n@sha256:index_digest_12345".to_string()];
+    assert!(is_local_digest_matching(&local, "sha256:index_digest_12345", None, "arm64"));
+
+    // Multi-arch index JSON with amd64 and arm64 manifests
+    let index_json = serde_json::json!({
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "manifests": [
+            {
+                "digest": "sha256:amd64_leaf_digest",
+                "platform": { "architecture": "amd64", "os": "linux" }
+            },
+            {
+                "digest": "sha256:arm64_leaf_digest",
+                "platform": { "architecture": "arm64", "os": "linux" }
+            }
+        ]
+    });
+
+    // Local has arm64 leaf digest, host is arm64 -> MATCH!
+    let local_arm64 = vec!["n8nio/n8n@sha256:arm64_leaf_digest".to_string()];
+    assert!(is_local_digest_matching(&local_arm64, "sha256:index_digest_different", Some(&index_json), "arm64"));
+
+    // Local has amd64 leaf digest, host is amd64 -> MATCH!
+    let local_amd64 = vec!["n8nio/n8n@sha256:amd64_leaf_digest".to_string()];
+    assert!(is_local_digest_matching(&local_amd64, "sha256:index_digest_different", Some(&index_json), "amd64"));
+
+    // Local has old/different leaf digest -> NO MATCH (update available)
+    let local_old = vec!["n8nio/n8n@sha256:outdated_leaf_digest".to_string()];
+    assert!(!is_local_digest_matching(&local_old, "sha256:index_digest_different", Some(&index_json), "arm64"));
+}

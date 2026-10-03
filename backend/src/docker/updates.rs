@@ -150,25 +150,132 @@ pub async fn check_remote_registry_for_update(docker: &Docker, image: &str) -> b
         req = req.header("Authorization", format!("Bearer {}", tok));
     }
 
+    let host_arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        "arm" => "arm",
+        "x86_64" => "amd64",
+        "x86" => "386",
+        "riscv64" => "riscv64",
+        other => other,
+    };
+
     if let Ok(res) = req.send().await {
         if res.status().is_success() {
             if let Some(remote_digest) = res.headers().get("docker-content-digest").and_then(|d| d.to_str().ok()) {
-                let matches = local_digests.iter().any(|ld| ld.ends_with(remote_digest) || ld.contains(remote_digest));
-                return !matches;
+                if is_local_digest_matching(&local_digests, remote_digest, None, host_arch) {
+                    return false;
+                }
+
+                let is_manifest_list = res.headers()
+                    .get(reqwest::header::CONTENT_TYPE)
+                    .and_then(|ct| ct.to_str().ok())
+                    .map(|ct| ct.contains("manifest.list") || ct.contains("image.index"))
+                    .unwrap_or(false);
+
+                if is_manifest_list {
+                    let mut get_req = client.get(&manifest_url)
+                        .header("Accept", "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json");
+                    if let Some(tok) = &token {
+                        get_req = get_req.header("Authorization", format!("Bearer {}", tok));
+                    }
+                    if let Ok(get_res) = get_req.send().await {
+                        if get_res.status().is_success() {
+                            if let Ok(index_val) = get_res.json::<serde_json::Value>().await {
+                                if is_local_digest_matching(&local_digests, remote_digest, Some(&index_val), host_arch) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return true;
             }
         } else if res.status() == StatusCode::UNAUTHORIZED && token.is_none() {
             // Handle Www-Authenticate challenge for generic registries
             if let Some(auth_hdr) = res.headers().get("www-authenticate").and_then(|h| h.to_str().ok()) {
                 if let Some(challenge_tok) = fetch_token_from_challenge(&client, auth_hdr, &repo).await {
                     let retry_req = client.head(&manifest_url)
-                        .header("Accept", "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
+                        .header("Accept", "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
                         .header("Authorization", format!("Bearer {}", challenge_tok));
                     if let Ok(retry_res) = retry_req.send().await {
                         if retry_res.status().is_success() {
                             if let Some(remote_digest) = retry_res.headers().get("docker-content-digest").and_then(|d| d.to_str().ok()) {
-                                let matches = local_digests.iter().any(|ld| ld.ends_with(remote_digest) || ld.contains(remote_digest));
-                                return !matches;
+                                if is_local_digest_matching(&local_digests, remote_digest, None, host_arch) {
+                                    return false;
+                                }
+
+                                let is_manifest_list = retry_res.headers()
+                                    .get(reqwest::header::CONTENT_TYPE)
+                                    .and_then(|ct| ct.to_str().ok())
+                                    .map(|ct| ct.contains("manifest.list") || ct.contains("image.index"))
+                                    .unwrap_or(false);
+
+                                if is_manifest_list {
+                                    let get_req = client.get(&manifest_url)
+                                        .header("Accept", "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
+                                        .header("Authorization", format!("Bearer {}", challenge_tok));
+                                    if let Ok(get_res) = get_req.send().await {
+                                        if get_res.status().is_success() {
+                                            if let Ok(index_val) = get_res.json::<serde_json::Value>().await {
+                                                if is_local_digest_matching(&local_digests, remote_digest, Some(&index_val), host_arch) {
+                                                    return false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                return true;
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+pub fn is_local_digest_matching(
+    local_digests: &[String],
+    remote_digest: &str,
+    index_json: Option<&serde_json::Value>,
+    host_arch: &str,
+) -> bool {
+    // 1. Direct match with remote digest (manifest list / index or single manifest)
+    if local_digests
+        .iter()
+        .any(|ld| ld.ends_with(remote_digest) || ld.contains(remote_digest))
+    {
+        return true;
+    }
+
+    // 2. Check child platform manifests in index JSON
+    if let Some(index) = index_json {
+        if let Some(manifests) = index.get("manifests").and_then(|m| m.as_array()) {
+            for manifest in manifests {
+                let arch_matches = manifest
+                    .get("platform")
+                    .and_then(|p| p.get("architecture"))
+                    .and_then(|a| a.as_str())
+                    .map(|a| a == host_arch)
+                    .unwrap_or(false);
+                let os_matches = manifest
+                    .get("platform")
+                    .and_then(|p| p.get("os"))
+                    .and_then(|o| o.as_str())
+                    .map(|o| o == "linux")
+                    .unwrap_or(true);
+
+                if arch_matches && os_matches {
+                    if let Some(child_digest) = manifest.get("digest").and_then(|d| d.as_str()) {
+                        if local_digests
+                            .iter()
+                            .any(|ld| ld.ends_with(child_digest) || ld.contains(child_digest))
+                        {
+                            return true;
                         }
                     }
                 }
