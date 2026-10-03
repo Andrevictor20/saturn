@@ -16,7 +16,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:visual": "playwright test visual.spec.ts --update-snapshots",
     "test:visual:ci": "playwright test visual.spec.ts --update-snapshots",
-    "swagger": "swagger-ui-watcher ../backend/openapi.yaml -p 5174",
+    "swagger": "npx --yes swagger-ui-watcher ../backend/openapi.yaml -p 5174",
     "version:patch": "node ../scripts/bump-version.mjs patch",
     "version:minor": "node ../scripts/bump-version.mjs minor",
     "version:major": "node ../scripts/bump-version.mjs major"
@@ -53,7 +53,6 @@
     "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^28.1.0",
     "oxlint": "^1.75.0",
-    "swagger-ui-watcher": "^2.1.14",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"
