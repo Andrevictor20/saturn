@@ -105,7 +105,7 @@ pub fn spawn_compose_installation_with_env(
         // Write .env file (custom or default)
         let env_content = match custom_env {
             Some(ref env) => env.clone(),
-            None => format!("AppID={}\nTZ=UTC\nPUID=1000\nPGID=1000\n", id),
+            _ => format!("AppID={}\nTZ=UTC\nPUID=1000\nPGID=1000\n", id),
         };
         let env_path = format!("{}/.env", app_dir);
         let _ = fs::write(&env_path, env_content);

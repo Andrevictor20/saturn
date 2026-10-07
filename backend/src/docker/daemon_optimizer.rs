@@ -73,12 +73,9 @@ pub fn optimize_daemon_json_content(raw_json: &str) -> Result<(String, bool), St
 /// Inspects the host Docker daemon configuration and non-destructively tunes
 /// concurrency limits to accelerate image downloads and container updates.
 pub fn ensure_docker_daemon_optimized() -> bool {
-    let path = match resolve_daemon_json_path() {
-        Some(p) => p,
-        None => {
-            tracing::debug!("Docker daemon.json path could not be resolved on host");
-            return false;
-        }
+    let Some(path) = resolve_daemon_json_path() else {
+        tracing::debug!("Docker daemon.json path could not be resolved on host");
+        return false;
     };
 
     let raw_content = if path.exists() {
@@ -208,9 +205,8 @@ pub fn optimize_containerd_config_content(raw_toml: &str) -> (String, bool) {
 /// Inspects the host containerd configuration and non-destructively tunes
 /// concurrency limits to accelerate layer extraction and multi-layer unpacking.
 pub fn ensure_containerd_optimized() -> bool {
-    let path = match resolve_containerd_config_path() {
-        Some(p) => p,
-        None => return false,
+    let Some(path) = resolve_containerd_config_path() else {
+        return false;
     };
 
     let raw_content = if path.exists() {

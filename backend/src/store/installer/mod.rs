@@ -47,7 +47,7 @@ pub async fn install_app(Path(id): Path<String>) -> impl IntoResponse {
         let cache = APPS_CACHE.read().unwrap();
         match cache.iter().find(|a| a.id == id) {
             Some(a) => a.clone(),
-            None => {
+            _ => {
                 return (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({"error": "App not found"})),
@@ -95,7 +95,7 @@ pub async fn install_custom_app(
         let cache = APPS_CACHE.read().unwrap();
         match cache.iter().find(|a| a.id == id) {
             Some(a) => a.clone(),
-            None => {
+            _ => {
                 return (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({"error": "App not found"})),
@@ -402,7 +402,7 @@ pub async fn inspect_app_config(Path(id): Path<String>) -> impl IntoResponse {
         let cache = APPS_CACHE.read().unwrap();
         match cache.iter().find(|a| a.id == id) {
             Some(a) => a.clone(),
-            None => {
+            _ => {
                 return (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({"error": "App not found"})),
@@ -429,7 +429,7 @@ pub async fn install_status(Path(task_id): Path<String>) -> impl IntoResponse {
     let tasks = INSTALL_TASKS.read().unwrap();
     match tasks.get(&task_id) {
         Some(task) => (StatusCode::OK, Json(task.clone())).into_response(),
-        None => (StatusCode::NOT_FOUND, "Task not found").into_response(),
+        _ => (StatusCode::NOT_FOUND, "Task not found").into_response(),
     }
 }
 
@@ -443,7 +443,7 @@ pub async fn cancel_install_task(Path(task_id): Path<String>) -> impl IntoRespon
     let mut tasks = INSTALL_TASKS.write().unwrap();
     let task = match tasks.get_mut(&task_id) {
         Some(t) => t,
-        None => {
+        _ => {
             return (
                 StatusCode::NOT_FOUND,
                 Json(serde_json::json!({"error": "Task not found"})),
