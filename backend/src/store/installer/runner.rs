@@ -217,7 +217,7 @@ pub fn spawn_compose_installation_with_env(
                             || line.contains("MB/");
 
                         // Throttle frequent progress updates to avoid lock contention on INSTALL_TASKS
-                        if is_progress && !is_complete && last_progress_time.elapsed().as_millis() < 350 {
+                        if is_progress && is_complete == false && last_progress_time.elapsed().as_millis() < 350 {
                             continue;
                         }
                         last_progress_time = std::time::Instant::now();

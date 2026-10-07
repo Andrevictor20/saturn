@@ -251,7 +251,7 @@ pub async fn update_app(Path(id): Path<String>) -> impl IntoResponse {
                                 || line.contains('%')
                                 || line.contains("MB/");
 
-                            if is_progress && !is_complete && last_progress_time.elapsed().as_millis() < 350 {
+                            if is_progress && is_complete == false && last_progress_time.elapsed().as_millis() < 350 {
                                 continue;
                             }
                             last_progress_time = std::time::Instant::now();

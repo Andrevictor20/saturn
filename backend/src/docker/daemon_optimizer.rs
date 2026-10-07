@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde_json::Value;
+use tracing::{debug, info, warn};
 
 /// Resolves the candidate path for docker daemon configuration file.
 /// Prioritizes `/host/etc/docker/daemon.json` (container environment with rootfs mount)
@@ -74,7 +75,7 @@ pub fn optimize_daemon_json_content(raw_json: &str) -> Result<(String, bool), St
 /// concurrency limits to accelerate image downloads and container updates.
 pub fn ensure_docker_daemon_optimized() -> bool {
     let Some(path) = resolve_daemon_json_path() else {
-        tracing::debug!("Docker daemon.json path could not be resolved on host");
+        debug!("Docker daemon.json path could not be resolved on host");
         return false;
     };
 
@@ -82,7 +83,7 @@ pub fn ensure_docker_daemon_optimized() -> bool {
         match fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
-                tracing::warn!("Failed to read {}: {}", path.display(), e);
+                warn!("Failed to read {}: {}", path.display(), e);
                 return false;
             }
         }
@@ -92,8 +93,8 @@ pub fn ensure_docker_daemon_optimized() -> bool {
 
     match optimize_daemon_json_content(&raw_content) {
         Ok((new_json, changed)) => {
-            if !changed {
-                tracing::debug!("Docker daemon.json is already optimized for high-speed downloads");
+            if changed == false {
+                debug!("Docker daemon.json is already optimized for high-speed downloads");
                 ensure_containerd_optimized();
                 return true;
             }
@@ -103,12 +104,12 @@ pub fn ensure_docker_daemon_optimized() -> bool {
             }
 
             if let Err(e) = fs::write(&path, &new_json) {
-                tracing::warn!("Failed to write optimized daemon.json at {}: {}", path.display(), e);
+                warn!("Failed to write optimized daemon.json at {}: {}", path.display(), e);
                 ensure_containerd_optimized();
                 return false;
             }
 
-            tracing::info!(
+            info!(
                 "Successfully tuned Docker daemon at {} (max-concurrent-downloads: 10, max-concurrent-uploads: 5, max-download-attempts: 5)",
                 path.display()
             );
@@ -119,7 +120,7 @@ pub fn ensure_docker_daemon_optimized() -> bool {
             true
         }
         Err(e) => {
-            tracing::warn!("Skipping daemon optimization: {}", e);
+            warn!("Skipping daemon optimization: {}", e);
             false
         }
     }
@@ -219,7 +220,7 @@ pub fn ensure_containerd_optimized() -> bool {
     };
 
     let (new_toml, changed) = optimize_containerd_config_content(&raw_content);
-    if !changed {
+    if changed == false {
         return true;
     }
 
@@ -228,11 +229,11 @@ pub fn ensure_containerd_optimized() -> bool {
     }
 
     if let Err(e) = fs::write(&path, &new_toml) {
-        tracing::warn!("Failed to write optimized containerd config at {}: {}", path.display(), e);
+        warn!("Failed to write optimized containerd config at {}: {}", path.display(), e);
         return false;
     }
 
-    tracing::info!(
+    info!(
         "Successfully tuned containerd at {} (max_concurrent_downloads: 8, max_concurrent_unpacks: 4)",
         path.display()
     );
@@ -308,7 +309,7 @@ mod tests {
         }"#;
 
         let (_, changed) = optimize_daemon_json_content(optimized).expect("Should parse");
-        assert!(!changed, "Should not report changed when already optimized");
+        assert_eq!(changed, false, "Should not report changed when already optimized");
     }
 
     #[test]
@@ -320,7 +321,7 @@ mod tests {
         }"#;
 
         let (res, changed) = optimize_daemon_json_content(higher).expect("Should parse");
-        assert!(!changed);
+        assert_eq!(changed, false);
         let parsed: Value = serde_json::from_str(&res).unwrap();
         assert_eq!(parsed["max-concurrent-downloads"], 20);
     }
@@ -337,7 +338,7 @@ mod tests {
     fn test_optimize_containerd_config_existing() {
         let existing = "version = 2\n\n[plugins]\n  [plugins.\"io.containerd.transfer.v1.local\"]\n    max_concurrent_downloads = 3\n    max_concurrent_unpacks = 1\n";
         let (res, changed) = optimize_containerd_config_content(existing);
-        assert!(!changed);
+        assert_eq!(changed, false);
         assert!(res.contains("max_concurrent_downloads = 3"));
     }
 }
