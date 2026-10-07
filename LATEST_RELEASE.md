@@ -1,8 +1,8 @@
-# Saturn Dashboard v4.1.6
+# Saturn Dashboard v4.1.7
 
-### Novidades, Correções e Melhorias na Versão 4.1.6
+### Novidades, Correções e Melhorias na Versão 4.1.7
 
-### 🛠️ Correções & Estabilidade
-- **Resolução de Imagens Multi-Arquitetura no Verificador de Versões:** Imagens multi-arch (como `n8nio/n8n:latest`, `alpine`, `nginx`) agora têm seus manifestos filhos OCI/Docker index inspecionados para a arquitetura exata do host (`arm64`, `amd64`, etc.). Elimina o falso positivo permanente onde o Saturn alertava sobre atualizações inexistentes devido à divergência entre o digest do índice remoto e o digest da camada local.
-- **Eliminação de Short-Circuit Falso na Atualização em Lote:** Corrigido comportamento no atualizador em massa que interpretava tarefas concluídas passadas como se o container já estivesse atualizado na sessão corrente, pulando downloads e recriações sem executar. Tarefas finalizadas há mais de 120s no backend agora expiram automaticamente para `idle`.
-- **Prevenção de Falhas de Parsing JSON no Home Assistant:** Tratamento resiliente para respostas HTTP sem corpo JSON (como sessões expiradas `401` ou restrições de permissão `403`), exibindo mensagens amigáveis de autenticação em vez de erros genéricos de parsing no frontend. Leitura unificada de credenciais via utilitário de autenticação.
+### ⚡ Performance & Downloads
+- **Paralelismo Nativo no Docker Compose V2:** Invocação do `docker compose` atualizada para utilizar `--parallel 8` e `--ignore-buildable` nos fluxos de instalação e atualização de apps da loja e recriação de containers. Acelera significativamente o pull simultâneo de serviços e camadas.
+- **Throttling Inteligente do Stream de Progresso:** Implementada taxa de atualização controlada (350ms) durante eventos contínuos de `Downloading` e `Extracting` nas rotas do instalador. Elimina a contenção de locks síncronos (`RwLock`) no runtime Tokio do backend causada por centenas de mensagens de progresso por segundo.
+- **Tuning de Alta Performance do Containerd & Docker Daemon:** Adicionado otimizador de configuração para o containerd 2.x e Docker Daemon em `daemon_optimizer.rs`, ajustando a concorrência de extração (`max_concurrent_unpacks = 4`) e downloads paralelos (`max_concurrent_downloads = 8` / `10`), mitigando lentidão em sistemas com sistemas de arquivos modernos.

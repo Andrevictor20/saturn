@@ -44,11 +44,14 @@ pub async fn try_compose_update(
     let mut pull_cmd = tokio::process::Command::new("docker");
     pull_cmd
         .arg("compose")
+        .arg("--parallel")
+        .arg("8")
         .arg("-f")
         .arg(&compose_file_path)
         .arg("--project-directory")
         .arg(&project_dir)
         .arg("pull")
+        .arg("--ignore-buildable")
         .env("DOCKER_BUILDKIT", "1")
         .env("COMPOSE_PARALLEL_LIMIT", "8");
     if let Some(svc) = compose_service {

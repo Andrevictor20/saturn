@@ -173,7 +173,10 @@ pub fn spawn_compose_installation_with_env(
 
         let mut pull_cmd = Command::new("docker")
             .arg("compose")
+            .arg("--parallel")
+            .arg("8")
             .arg("pull")
+            .arg("--ignore-buildable")
             .env("DOCKER_BUILDKIT", "1")
             .env("COMPOSE_PARALLEL_LIMIT", "8")
             .current_dir(&app_dir)
@@ -192,27 +195,37 @@ pub fn spawn_compose_installation_with_env(
             if let Some(stderr) = child.stderr.take() {
                 let mut reader = tokio::io::BufReader::new(stderr).lines();
                 let mut pull_progress: u8 = 10;
+                let mut last_progress_time = std::time::Instant::now();
                 while let Ok(Some(line)) = reader.next_line().await {
                     if is_cancelled() {
                         let _ = child.kill().await;
                         break;
                     }
                     if !line.trim().is_empty() {
-                        if line.contains("Pull complete") || line.contains("Already exists") {
+                        let is_complete = line.contains("Pull complete") || line.contains("Already exists");
+                        if is_complete {
                             pull_progress = (pull_progress + 3).min(58);
                         } else if line.contains("Extracting") {
                             pull_progress = (pull_progress + 1).min(55);
                         } else if line.contains("Pulling") || line.contains("Downloading") {
                             pull_progress = (pull_progress + 1).min(45);
                         }
+
+                        let is_progress = line.contains("Extracting")
+                            || line.contains("Downloading")
+                            || line.contains('%')
+                            || line.contains("MB/");
+
+                        // Throttle frequent progress updates to avoid lock contention on INSTALL_TASKS
+                        if is_progress && !is_complete && last_progress_time.elapsed().as_millis() < 350 {
+                            continue;
+                        }
+                        last_progress_time = std::time::Instant::now();
+
                         let formatted = format!("[PULL] {}", line);
                         let mut tasks = INSTALL_TASKS.write().unwrap();
                         if let Some(task) = tasks.get_mut(&task_id_clone) {
                             task.progress = pull_progress;
-                            let is_progress = line.contains("Extracting")
-                                || line.contains("Downloading")
-                                || line.contains('%')
-                                || line.contains("MB/");
                             let should_replace = is_progress
                                 && task
                                     .logs
