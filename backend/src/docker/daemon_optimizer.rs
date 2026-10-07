@@ -1,7 +1,21 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde_json::Value;
-use tracing::{debug, info, warn};
+#[inline]
+fn log_info(msg: impl std::fmt::Display) {
+    eprintln!("[INFO] {}", msg);
+}
+
+#[inline]
+fn log_warn(msg: impl std::fmt::Display) {
+    eprintln!("[WARN] {}", msg);
+}
+
+#[inline]
+fn log_debug(_msg: impl std::fmt::Display) {
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] {}", _msg);
+}
 
 /// Resolves the candidate path for docker daemon configuration file.
 /// Prioritizes `/host/etc/docker/daemon.json` (container environment with rootfs mount)
@@ -75,7 +89,7 @@ pub fn optimize_daemon_json_content(raw_json: &str) -> Result<(String, bool), St
 /// concurrency limits to accelerate image downloads and container updates.
 pub fn ensure_docker_daemon_optimized() -> bool {
     let Some(path) = resolve_daemon_json_path() else {
-        debug!("Docker daemon.json path could not be resolved on host");
+        log_debug("Docker daemon.json path could not be resolved on host");
         return false;
     };
 
@@ -83,7 +97,7 @@ pub fn ensure_docker_daemon_optimized() -> bool {
         match fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
-                warn!("Failed to read {}: {}", path.display(), e);
+                log_warn(format!("Failed to read {}: {}", path.display(), e));
                 return false;
             }
         }
@@ -94,7 +108,7 @@ pub fn ensure_docker_daemon_optimized() -> bool {
     match optimize_daemon_json_content(&raw_content) {
         Ok((new_json, changed)) => {
             if changed == false {
-                debug!("Docker daemon.json is already optimized for high-speed downloads");
+                log_debug("Docker daemon.json is already optimized for high-speed downloads");
                 ensure_containerd_optimized();
                 return true;
             }
@@ -104,15 +118,15 @@ pub fn ensure_docker_daemon_optimized() -> bool {
             }
 
             if let Err(e) = fs::write(&path, &new_json) {
-                warn!("Failed to write optimized daemon.json at {}: {}", path.display(), e);
+                log_warn(format!("Failed to write optimized daemon.json at {}: {}", path.display(), e));
                 ensure_containerd_optimized();
                 return false;
             }
 
-            info!(
+            log_info(format!(
                 "Successfully tuned Docker daemon at {} (max-concurrent-downloads: 10, max-concurrent-uploads: 5, max-download-attempts: 5)",
                 path.display()
-            );
+            ));
 
             // Attempt safe live reload via SIGHUP (does not restart running containers)
             reload_docker_daemon_safely();
@@ -120,7 +134,7 @@ pub fn ensure_docker_daemon_optimized() -> bool {
             true
         }
         Err(e) => {
-            warn!("Skipping daemon optimization: {}", e);
+            log_warn(format!("Skipping daemon optimization: {}", e));
             false
         }
     }
@@ -148,9 +162,9 @@ pub fn resolve_containerd_config_path() -> Option<PathBuf> {
 pub fn optimize_containerd_config_content(raw_toml: &str) -> (String, bool) {
     let has_transfer_plugin = raw_toml.contains("io.containerd.transfer.v1.local");
 
-    if !has_transfer_plugin {
+    if has_transfer_plugin == false {
         let mut output = raw_toml.trim_end().to_string();
-        if !output.is_empty() {
+        if output.is_empty() == false {
             output.push_str("\n\n");
         }
         output.push_str("[plugins.\"io.containerd.transfer.v1.local\"]\n");
@@ -187,11 +201,11 @@ pub fn optimize_containerd_config_content(raw_toml: &str) -> (String, bool) {
         }
     }
 
-    if !has_unpacks {
+    if has_unpacks == false {
         lines.insert(insert_idx, "  max_concurrent_unpacks = 4".to_string());
         changed = true;
     }
-    if !has_downloads {
+    if has_downloads == false {
         lines.insert(insert_idx, "  max_concurrent_downloads = 8".to_string());
         changed = true;
     }
@@ -229,14 +243,14 @@ pub fn ensure_containerd_optimized() -> bool {
     }
 
     if let Err(e) = fs::write(&path, &new_toml) {
-        warn!("Failed to write optimized containerd config at {}: {}", path.display(), e);
+        log_warn(format!("Failed to write optimized containerd config at {}: {}", path.display(), e));
         return false;
     }
 
-    info!(
+    log_info(format!(
         "Successfully tuned containerd at {} (max_concurrent_downloads: 8, max_concurrent_unpacks: 4)",
         path.display()
-    );
+    ));
 
     reload_containerd_safely();
     true

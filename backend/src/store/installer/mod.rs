@@ -28,14 +28,14 @@ pub static TASK_PIDS: Lazy<RwLock<HashMap<String, u32>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn is_valid_app_id(id: &str) -> bool {
-    !id.is_empty()
+    id.is_empty() == false
         && id.len() <= 128
         && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-        && !id.starts_with('.')
+        && id.starts_with('.') == false
 }
 
 pub async fn install_app(Path(id): Path<String>) -> impl IntoResponse {
-    if !is_valid_app_id(&id) {
+    if is_valid_app_id(&id) == false {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid app ID (path traversal protection)"})),
@@ -83,7 +83,7 @@ pub async fn install_custom_app(
     Path(id): Path<String>,
     Json(payload): Json<CustomInstallPayload>,
 ) -> impl IntoResponse {
-    if !is_valid_app_id(&id) {
+    if is_valid_app_id(&id) == false {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid app ID (path traversal protection)"})),
@@ -128,7 +128,7 @@ pub async fn install_custom_app(
 }
 
 pub async fn uninstall_app(Path(id): Path<String>) -> impl IntoResponse {
-    if !is_valid_app_id(&id) {
+    if is_valid_app_id(&id) == false {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid app ID (path traversal protection)"})),
@@ -171,7 +171,7 @@ pub async fn uninstall_app(Path(id): Path<String>) -> impl IntoResponse {
 }
 
 pub async fn update_app(Path(id): Path<String>) -> impl IntoResponse {
-    if !is_valid_app_id(&id) {
+    if is_valid_app_id(&id) == false {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid app ID (path traversal protection)"})),
@@ -390,7 +390,7 @@ pub async fn update_app(Path(id): Path<String>) -> impl IntoResponse {
 }
 
 pub async fn inspect_app_config(Path(id): Path<String>) -> impl IntoResponse {
-    if !is_valid_app_id(&id) {
+    if is_valid_app_id(&id) == false {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid app ID (path traversal protection)"})),
