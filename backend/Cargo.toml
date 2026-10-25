@@ -24,10 +24,10 @@ mimalloc = { version = "0.1.52", default-features = false }
 subtle = "2.6.1"
 sysinfo = "0.39.6"
 time = "0.3.55"
-tokio = { version = "1.53.1", features = ["full"] }
+tokio = { version = "1.54.0", features = ["full"] }
 tower-http = { version = "0.7.0", features = ["set-header", "cors", "fs", "compression-full"] }
 uuid = { version = "1.24.1", features = ["v4"] }
-zip = "8.6.0"
+zip = "9.0.0"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2.3"
