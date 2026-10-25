@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use tracing::{debug, error, info, warn};
 use crate::files::path_utils::sanitize_path;
 
 fn get_chunks_base_dir() -> PathBuf {
@@ -65,20 +66,35 @@ pub async fn upload_chunk_handler(
     }
 
     if upload_id.is_empty() {
+        warn!("upload_chunk_handler: upload_id vazio");
         return Err((StatusCode::BAD_REQUEST, "upload_id é obrigatório".to_string()));
     }
 
-    let data = chunk_data.ok_or((StatusCode::BAD_REQUEST, "chunk data ausente".to_string()))?;
+    let data = match chunk_data {
+        Some(d) => d,
+        None => {
+            warn!("upload_chunk_handler: chunk data ausente (upload_id={}, chunk_index={})", upload_id, chunk_index);
+            return Err((StatusCode::BAD_REQUEST, "chunk data ausente".to_string()));
+        }
+    };
 
     // Safe path inside chunks base dir
     let clean_id: String = upload_id.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
     let upload_dir = get_chunks_base_dir().join(&clean_id);
-    fs::create_dir_all(&upload_dir)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if let Err(e) = fs::create_dir_all(&upload_dir) {
+        error!("upload_chunk_handler: falha ao criar diretório de upload {:?}: {}", upload_dir, e);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
 
     let chunk_path = upload_dir.join(format!("{}.chunk", chunk_index));
-    fs::write(&chunk_path, data)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let data_len = data.len();
+    if let Err(e) = fs::write(&chunk_path, data) {
+        error!("upload_chunk_handler: falha ao gravar chunk {:?} (upload_id={}, chunk_index={}, bytes={}): {}", chunk_path, upload_id, chunk_index, data_len, e);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+
+    debug!("upload_chunk_handler: chunk gravado {:?} (upload_id={}, chunk_index={}, bytes={})", chunk_path, upload_id, chunk_index, data_len);
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -119,6 +135,8 @@ pub async fn get_upload_status_handler(
 
     uploaded_chunks.sort();
 
+    debug!("get_upload_status_handler: upload_id={} exists={} chunks={:?}", clean_id, upload_dir.exists(), uploaded_chunks);
+
     Ok(Json(UploadStatusResponse {
         upload_id: clean_id,
         uploaded_chunks,
@@ -132,16 +150,27 @@ pub async fn complete_upload_handler(
     let clean_id: String = payload.upload_id.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
     let upload_dir = get_chunks_base_dir().join(&clean_id);
 
+    info!("complete_upload_handler: início (upload_id={}, filename={}, destination={:?})", 
+        clean_id, payload.filename, payload.destination);
+
     if !upload_dir.exists() {
+        warn!("complete_upload_handler: sessão de upload não encontrada {:?}", upload_dir);
         return Err((StatusCode::NOT_FOUND, "Sessão de upload não encontrada".to_string()));
     }
 
     let dest_str = payload.destination.unwrap_or_else(|| "/DATA".to_string());
-    let dest_dir = sanitize_path(&dest_str)
-        .map_err(|_| (StatusCode::BAD_REQUEST, "Destino inválido".to_string()))?;
+    let dest_dir = match sanitize_path(&dest_str) {
+        Ok(d) => d,
+        Err(_) => {
+            warn!("complete_upload_handler: destino inválido {}", dest_str);
+            return Err((StatusCode::BAD_REQUEST, "Destino inválido".to_string()));
+        }
+    };
 
-    fs::create_dir_all(&dest_dir)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if let Err(e) = fs::create_dir_all(&dest_dir) {
+        error!("complete_upload_handler: falha ao criar diretório destino {:?}: {}", dest_dir, e);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
 
     let final_file_path = dest_dir.join(&payload.filename);
 
@@ -161,40 +190,64 @@ pub async fn complete_upload_handler(
     }
 
     if chunk_indices.is_empty() {
+        warn!("complete_upload_handler: nenhuma fatia encontrada (upload_id={})", clean_id);
         return Err((StatusCode::BAD_REQUEST, "Nenhuma fatia encontrada para montar o arquivo".to_string()));
     }
 
     chunk_indices.sort();
+    debug!("complete_upload_handler: montando {} chunks (upload_id={}) para {:?}", chunk_indices.len(), clean_id, final_file_path);
 
-    // Assemble file sequentially in 64KB buffers (constant O(1) RAM)
-    let mut output_file = File::create(&final_file_path)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut output_file = match File::create(&final_file_path) {
+        Ok(f) => f,
+        Err(e) => {
+            error!("complete_upload_handler: falha ao criar arquivo final {:?}: {}", final_file_path, e);
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+        }
+    };
 
     let mut buf = [0u8; 64 * 1024];
 
     for idx in chunk_indices {
         let chunk_file_path = upload_dir.join(format!("{}.chunk", idx));
-        let mut chunk_file = File::open(&chunk_file_path)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let mut chunk_file = match File::open(&chunk_file_path) {
+            Ok(f) => f,
+            Err(e) => {
+                error!("complete_upload_handler: falha ao abrir chunk {:?}: {}", chunk_file_path, e);
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+            }
+        };
 
         loop {
-            let n = chunk_file.read(&mut buf)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            let n = match chunk_file.read(&mut buf) {
+                Ok(n) => n,
+                Err(e) => {
+                    error!("complete_upload_handler: falha ao ler chunk {:?}: {}", chunk_file_path, e);
+                    return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+                }
+            };
             if n == 0 {
                 break;
             }
-            output_file.write_all(&buf[..n])
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if let Err(e) = output_file.write_all(&buf[..n]) {
+                error!("complete_upload_handler: falha ao escrever em {:?}: {}", final_file_path, e);
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+            }
         }
     }
 
-    output_file.flush()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if let Err(e) = output_file.flush() {
+        error!("complete_upload_handler: falha ao flush {:?}: {}", final_file_path, e);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
 
     let total_size = fs::metadata(&final_file_path).map(|m| m.len()).unwrap_or(0);
 
     // Clean up temp chunks directory
-    let _ = fs::remove_dir_all(&upload_dir);
+    if let Err(e) = fs::remove_dir_all(&upload_dir) {
+        warn!("complete_upload_handler: falha ao limpar diretório temporário {:?}: {}", upload_dir, e);
+    }
+
+    info!("complete_upload_handler: concluído com sucesso (upload_id={}, arquivo={:?}, size_bytes={})", clean_id, final_file_path, total_size);
 
     Ok(Json(serde_json::json!({
         "success": true,

@@ -13,6 +13,32 @@ import { saveFileToDb, getFileFromDb, removeFileFromDb } from '../utils/uploadDb
 import { getAuthToken } from '../utils/auth';
 
 export const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk for high throughput & low overhead
+export const MAX_CHUNK_RETRIES = 3; // retry automático em falhas transitórias de rede
+export const CHUNK_RETRY_BACKOFF_MS = 1000; // backoff inicial entre tentativas (ms)
+export const CHUNK_REQUEST_TIMEOUT_MS = 60_000; // timeout por requisição de chunk (ms)
+
+// Pequeno atraso para backoff exponencial entre tentativas de chunk
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Fetch com timeout explícito; aborta o signal do upload se o timeout expirar
+const fetchWithTimeout = (
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> => {
+  let timeoutTimer: ReturnType<typeof setTimeout>;
+  const controller = new AbortController();
+  const promise = fetch(url, { ...init, signal: controller.signal });
+
+  const timeoutPromise = new Promise<Response>((_, reject) => {
+    timeoutTimer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`Tempo esgotado após ${timeoutMs / 1000}s`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutTimer));
+};
 
 export interface UploadItem {
   id: string;
@@ -118,8 +144,10 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       let uploadedCount = currentUploadedChunks.length;
       let lastBytesSent = uploadedCount * CHUNK_SIZE;
       let lastTime = Date.now();
+      // Throttle de UI: evita re-render da gaveta de progresso a cada chunk em arquivos grandes
+      let lastReportedPercent = item.progress;
 
-      // 2. Upload missing chunks sequentially
+      // 2. Upload missing chunks sequentially (com retry + timeout por requisição)
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         if (controller.signal.aborted) return;
 
@@ -131,30 +159,66 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         const end = Math.min(file.size, (chunkIndex + 1) * CHUNK_SIZE);
         const chunkBlob = file.slice(start, end);
 
-        const formData = new FormData();
-        formData.append('chunk', chunkBlob, file.name);
-        formData.append('upload_id', item.id);
-        formData.append('chunk_index', chunkIndex.toString());
-        formData.append('total_chunks', totalChunks.toString());
-        formData.append('filename', file.name);
-        formData.append('destination_path', item.destinationPath);
+        const buildFormData = () => {
+          const fd = new FormData();
+          fd.append('chunk', chunkBlob, file.name);
+          fd.append('upload_id', item.id);
+          fd.append('chunk_index', chunkIndex.toString());
+          fd.append('total_chunks', totalChunks.toString());
+          fd.append('filename', file.name);
+          fd.append('destination_path', item.destinationPath);
+          return fd;
+        };
 
-        const chunkRes = await fetch('/api/files/upload/chunk', {
-          method: 'POST',
-          headers: authHeaders,
-          body: formData,
-          signal: controller.signal,
-        });
+        let lastChunkError: Error | null = null;
+        let chunkOk = false;
 
-        if (!chunkRes.ok) {
-          const errText = await chunkRes.text().catch(() => 'Falha no chunk');
-          throw new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
+        for (let attempt = 0; attempt <= MAX_CHUNK_RETRIES; attempt++) {
+          if (controller.signal.aborted) return;
+
+          try {
+            const chunkRes = await fetchWithTimeout(
+              '/api/files/upload/chunk',
+              {
+                method: 'POST',
+                headers: authHeaders,
+                body: buildFormData(),
+                signal: controller.signal,
+              },
+              CHUNK_REQUEST_TIMEOUT_MS,
+            );
+
+            if (chunkRes.ok) {
+              chunkOk = true;
+              break;
+            }
+
+            // Erros 4xx (exceto 429/5xx transitórios) não se beneficiam de retry
+            const errText = await chunkRes.text().catch(() => 'Falha no chunk');
+            if (chunkRes.status === 429 || chunkRes.status >= 500) {
+              lastChunkError = new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
+            } else {
+              throw new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
+            }
+          } catch (err: any) {
+            if (err?.name === 'AbortError') return;
+            lastChunkError = err;
+          }
+
+          if (attempt < MAX_CHUNK_RETRIES) {
+            const backoff = CHUNK_RETRY_BACKOFF_MS * Math.pow(2, attempt);
+            await sleep(backoff);
+          }
+        }
+
+        if (!chunkOk) {
+          throw lastChunkError || new Error(`Falha no envio do bloco ${chunkIndex + 1}`);
         }
 
         currentUploadedChunks.push(chunkIndex);
         uploadedCount++;
 
-        // Calculate speed
+        // Calculate speed (atualizado apenas periodicamente para não saturar a UI)
         const now = Date.now();
         const timeDiffSec = (now - lastTime) / 1000;
         let speed = item.speedMBs;
@@ -167,11 +231,16 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
 
         const progressPercent = Math.min(99, Math.round((uploadedCount / totalChunks) * 100));
 
-        updateItem(item.id, {
-          uploadedChunks: [...currentUploadedChunks],
-          progress: progressPercent,
-          speedMBs: speed,
-        });
+        // Throttle: grava no estado só quando o percentual muda ou a cada 4 chunks
+        const shouldReport = progressPercent !== lastReportedPercent || uploadedCount % 4 === 0;
+        if (shouldReport) {
+          lastReportedPercent = progressPercent;
+          updateItem(item.id, {
+            uploadedChunks: [...currentUploadedChunks],
+            progress: progressPercent,
+            speedMBs: speed,
+          });
+        }
       }
 
       // 3. Complete and assemble upload on server
