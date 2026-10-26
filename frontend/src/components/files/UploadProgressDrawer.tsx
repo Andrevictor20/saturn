@@ -6,9 +6,10 @@ import {
   Pause, 
   Play, 
   CheckCircle2, 
-  AlertCircle, 
+  AlertCircle,
   Trash2,
-  FileText
+  FileText,
+  HardDrive
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUploadManager } from '../../contexts/UploadManagerContext';
@@ -147,11 +148,21 @@ export function UploadProgressDrawer() {
                 className="bg-accent/40 border border-border/70 rounded-xl p-2.5 space-y-2 text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-saturn-500 shrink-0" />
-                    <span className="font-semibold text-primary truncate max-w-[140px] sm:max-w-[180px]" title={item.fileName}>
-                      {item.fileName}
-                    </span>
+                  <div className="flex items-center gap-2 min-w-0 flex-col">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-saturn-500 shrink-0" />
+                      <span className="font-semibold text-primary truncate max-w-[140px] sm:max-w-[180px]" title={item.fileName}>
+                        {item.fileName}
+                      </span>
+                    </div>
+                    {item.destinationPath && (
+                      <div className="flex items-center gap-1 min-w-0">
+                        <HardDrive className="w-3 h-3 text-secondary shrink-0" />
+                        <span className="text-[10px] text-secondary truncate max-w-[200px]" title={item.destinationPath}>
+                          {item.destinationPath}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
