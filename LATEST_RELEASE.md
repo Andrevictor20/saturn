@@ -1,8 +1,9 @@
-# Saturn Dashboard v4.1.9
+# Saturn Dashboard v4.1.10
 
-### Novidades, Correções e Melhorias na Versão 4.1.9
+### Novidades, Correções e Melhorias na Versão 4.1.10
 
-### 🐛 Correção: Upload de Vídeos/Arquivos Grandes no Gerenciador de Arquivos
+### 🐛 Correção: Upload de Vídeos no Gerenciador de Arquivos (erro de parsing multipart)
+- **DefaultBodyLimit nas rotas de upload:** Adicionado `DefaultBodyLimit::max(10 GB)` nas rotas `/api/files/upload/chunk` e `/complete`. O limite padrão do Axum (~2 MB) bloqueava o parsing de requisições `multipart/form-data` com chunks de 5 MB+, causando erro `Error parsing 'multipart/form-data' request` em vídeos de 4 MB a 5,5 MB.
 - **Limite total de upload no backend:** `chunked_upload.rs` agora rejeita com erro **413 Payload Too Large** uploads que excedam 10 GB, evitando encher o disco silenciosamente; antes não havia nenhum teto.
 - **Cleanup garantido em erro:** O diretório temporário de fragmentos e qualquer arquivo final parcial são removidos em todo caminho de falha da montagem (disco cheio, caminho inválido, leitura de chunk, flush), eliminando fragmentos órfãos.
 - **Logging estruturado aprimorado:** `tracing` emite `upload_id`, `chunk_index`, `bytes`, `total_size` e motivo exato (disco, caminho, tamanho) em cada etapa do upload e montagem.
