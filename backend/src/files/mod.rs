@@ -28,6 +28,7 @@ pub use chunked_upload::*;
 pub use thumbnails::*;
 
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get, post, put},
     Router,
 };
@@ -68,9 +69,13 @@ pub fn protected_router() -> Router<AppState> {
         .route("/api/samba/toggle", post(toggle_samba_service))
         .route("/api/samba/shares", get(list_samba_shares).post(create_samba_share))
         .route("/api/samba/shares/{name}", delete(delete_samba_share))
-        .route("/api/files/upload/chunk", post(upload_chunk_handler))
-        .route("/api/files/upload/status", get(get_upload_status_handler))
-        .route("/api/files/upload/complete", post(complete_upload_handler))
+        .merge(
+        Router::new()
+            .route("/api/files/upload/chunk", post(upload_chunk_handler))
+            .route("/api/files/upload/status", get(get_upload_status_handler))
+            .route("/api/files/upload/complete", post(complete_upload_handler))
+            .layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)), // 10 GB: permite chunks de vídeo grandes sem falha de parsing multipart
+    )
 }
 
 pub fn public_router() -> Router {
