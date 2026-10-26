@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "4.1.8"
+version = "4.1.11"
 dependencies = [
  "argon2",
  "axum",

@@ -4,7 +4,8 @@ import {
   ChevronDown, 
   ChevronUp, 
   Pause, 
-  Play, 
+  Play,
+  RotateCcw,
   CheckCircle2, 
   AlertCircle,
   Trash2,
@@ -182,6 +183,15 @@ export function UploadProgressDrawer() {
                         title={t('files.resume_upload', 'Retomar envio')}
                       >
                         <Play className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {isError && (
+                      <button
+                        onClick={() => resumeUpload(item.id)}
+                        className="p-1 rounded text-secondary hover:text-emerald-500 hover:bg-accent transition-colors"
+                        title={t('files.resume_upload', 'Retomar envio')}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     )}
                     <button

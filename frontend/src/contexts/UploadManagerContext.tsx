@@ -1,11 +1,4 @@
-import { 
-  createContext, 
-  useContext, 
-  useState, 
-  useEffect, 
-  useRef, 
-  useCallback 
-} from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -436,24 +429,25 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
     setUploads((prev) => prev.filter((u) => u.status !== 'completed'));
   }, []);
 
-  // On initial mount / F5 reload: auto-hydrate active uploads from IndexedDB & server status
+  // Hydrate active uploads on mount / F5 (uploading, paused, error). 'completed' is handled by clearCompleted.
   useEffect(() => {
     const hydrateActiveUploads = async () => {
       for (const item of uploads) {
-        if (item.status === 'uploading' || item.status === 'paused') {
-          const file = await getFileFromDb(item.id);
-          if (file) {
-            fileCacheRef.current.set(item.id, file);
-            // If it was uploading before F5, auto-resume it!
-            if (item.status === 'uploading') {
-              processUpload(item, file);
-            }
-          } else {
-            updateItem(item.id, {
-              status: 'paused',
-              error: t('files.upload_page_reloaded', 'Página recarregada. Clique em Retomar para continuar o envio.'),
-            });
-          }
+        if (item.status !== 'uploading' && item.status !== 'paused' && item.status !== 'error') continue;
+        const file = await getFileFromDb(item.id);
+        if (file) {
+          fileCacheRef.current.set(item.id, file);
+          // Auto-retoma apenas 'uploading'; 'error' fica visível para retomada manual.
+          if (item.status === 'uploading') processUpload(item, file);
+        } else if (item.status === 'error') {
+          updateItem(item.id, {
+            error: t('files.upload_file_not_available_locally', 'Arquivo não está mais disponível localmente. Reenvie o arquivo.'),
+          });
+        } else {
+          updateItem(item.id, {
+            status: 'paused',
+            error: t('files.upload_page_reloaded', 'Página recarregada. Clique em Retomar para continuar o envio.'),
+          });
         }
       }
     };
