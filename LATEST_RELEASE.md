@@ -1,8 +1,11 @@
-# Saturn Dashboard v4.1.11
+# Saturn Dashboard v4.1.12
 
-### Novidades, Correções e Melhorias na Versão 4.1.11
+### Novidades, Correções e Melhorias na Versão 4.1.12
 
-### 🐛 Correção: Upload de Vídeos no Gerenciador de Arquivos (arquivo não aparecia após sucesso)
+### ✨ Melhoria: Tempo Estimado (ETA) no Upload de Arquivos
+- **ETA no drawer de upload:** `UploadManagerContext` agora calcula `etaSeconds` com base na velocidade atual e bytes pendentes; o `UploadProgressDrawer` exibe o tempo restante tanto no modo minimizado (pill flutuante) quanto no modo expandido (por item), formatado como "2m 30s", "45s" ou "1h 10m".
+
+### 🐛 Correções (v4.1.11)
 - **Campo de destino no upload completo:** `UploadManagerContext` agora envia `destination` (em vez de `destination_path`) no corpo do `POST /api/files/upload/complete`, batendo com o campo lido pelo backend. Antes, o backend usava o default `/DATA`, gravando o arquivo no caminho errado; o upload reportava sucesso mas o arquivo não aparecia na interface nem chegava ao diretório esperado pelo usuário.
 - **DefaultBodyLimit nas rotas de upload:** `DefaultBodyLimit::max(10 GB)` nas rotas `/api/files/upload/chunk` e `/complete`, corrigindo erro `Error parsing 'multipart/form-data' request` em chunks de 5 MB+.
 - **Limite total de upload no backend:** `chunked_upload.rs` rejeita com erro **413 Payload Too Large** uploads que excedam 10 GB, evitando encher o disco silenciosamente.
