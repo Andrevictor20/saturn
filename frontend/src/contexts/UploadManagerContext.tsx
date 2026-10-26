@@ -278,7 +278,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({
           upload_id: item.id,
           filename: file.name,
-          destination_path: item.destinationPath,
+          destination: item.destinationPath,
           total_chunks: totalChunks,
         }),
         signal: controller.signal,
