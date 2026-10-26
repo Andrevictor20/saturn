@@ -1,14 +1,15 @@
-# Saturn Dashboard v4.1.8
+# Saturn Dashboard v4.1.9
 
-### Novidades, Correções e Melhorias na Versão 4.1.8
+### Novidades, Correções e Melhorias na Versão 4.1.9
 
-### 🐛 Correção: Upload de Vídeos no Gerenciador de Arquivos
-- **Upload de arquivos grandes (vídeos) de qualquer tamanho:** Corrigida a falha no envio de vídeos pelo gerenciador de arquivos enquanto imagens funcionavam normalmente. A causa era falta de robustez para arquivos grandes (muitos chunks de 5 MB sequenciais), não filtro de tipo nem limite de tamanho.
-- **Retry automático com backoff exponencial:** O frontend (`UploadManagerContext.tsx`) agora tenta novamente automaticamente (até 3x com backoff) em falhas transitórias de rede ou erros 5xx no envio de cada chunk, evitando que um único pico de rede aborte todo o upload.
-- **Timeout por requisição de chunk:** Timeout de 60 s por requisição de chunk para não travar indefinidamente em uploads longos.
-- **Throttle de progresso da UI:** A gaveta de upload não re-renderiza a cada chunk em arquivos grandes, evitando travamento da interface durante o envio.
-- **Logging estruturado no backend:** `chunked_upload.rs` agora emite logs detalhados (`tracing`) em cada chunk gravado e na montagem final, expondo a causa real de falhas (disco, caminho, tamanho).
-- **Testes:** Novo teste de integração `test_complete_upload_assembles_large_file_from_many_chunks` que monta um arquivo grande a partir de múltiplos chunks e confere conteúdo e tamanho exatos; 2 testes de chunked_upload passando, 55 testes de lib passando, 63 testes de files do frontend passando e `tsc --noEmit` limpo.
+### 🐛 Correção: Upload de Vídeos/Arquivos Grandes no Gerenciador de Arquivos
+- **Limite total de upload no backend:** `chunked_upload.rs` agora rejeita com erro **413 Payload Too Large** uploads que excedam 10 GB, evitando encher o disco silenciosamente; antes não havia nenhum teto.
+- **Cleanup garantido em erro:** O diretório temporário de fragmentos e qualquer arquivo final parcial são removidos em todo caminho de falha da montagem (disco cheio, caminho inválido, leitura de chunk, flush), eliminando fragmentos órfãos.
+- **Logging estruturado aprimorado:** `tracing` emite `upload_id`, `chunk_index`, `bytes`, `total_size` e motivo exato (disco, caminho, tamanho) em cada etapa do upload e montagem.
+- **Tratamento de cota do IndexedDB:** `saveFileToDb` detecta `QuotaExceededError` e grava apenas metadados leves (nome, tamanho, tipo, caminho, chunks) sem o blob, retornando `savedBlob: false`; outros erros são propagados em vez de silenciados. Adicionada `getUploadMetadata(id)`.
+- **Verificação de cota antes de salvar blob:** `UploadManagerContext` consulta `navigator.storage.estimate()`; se a cota estiver ≥ 85%, pula a gravação do blob e avisa o usuário que a retomada após F5 não estará disponível para aquele arquivo.
+- **Timeout de chunk dinâmico:** `CHUNK_REQUEST_TIMEOUT_MS` (60s base) + 30s a cada 100 MB do arquivo, teto de 300s — arquivos grandes em rede lenta não morrem por timeout fixo de 60s.
+- **Testes:** 55 testes de lib backend, 2 testes de chunked_upload, 63 testes de files do frontend e `tsc --noEmit` todos passando.
 
 ### ⚠️ Limite de Infraestrutura
 - "Qualquer tamanho" depende ainda de espaço em disco disponível e de timeouts/limites de corpo de requisição de proxies reversos na frente (nginx, Traefik, túnel Cloudflare), que são de infraestrutura, não de código do Saturn.

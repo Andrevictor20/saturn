@@ -6,9 +6,15 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, error, info, warn};
 use crate::files::path_utils::sanitize_path;
+
+// Teto total de bytes por envio fragmentado. Evita que um upload grande encha
+// o disco ou falhe silenciosamente (sem OOM, pois a montagem é feita por
+// streaming com buffer fixo de 64 KB). 10 GB é um teto generoso para vídeos
+// domésticos e é consistente com o limite já usado para backups.
+const MAX_UPLOAD_TOTAL_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 
 fn get_chunks_base_dir() -> PathBuf {
     let base = if std::path::Path::new("/data").is_dir() {
@@ -16,9 +22,7 @@ fn get_chunks_base_dir() -> PathBuf {
     } else {
         "data"
     };
-    let saturn_dir = PathBuf::from(format!("{}/.saturn_chunks", base));
-
-    saturn_dir
+    PathBuf::from(format!("{}/.saturn_chunks", base))
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +42,33 @@ pub struct CompleteUploadPayload {
     pub upload_id: String,
     pub filename: String,
     pub destination: Option<String>,
+}
+
+/// Remove o diretório temporário de fragmentos (best-effort).
+fn cleanup_upload_dir(upload_dir: &Path) {
+    if let Err(e) = fs::remove_dir_all(upload_dir) {
+        warn!("chunked_upload: falha ao limpar diretório temporário {:?}: {}", upload_dir, e);
+    }
+}
+
+/// Rollback em caso de erro: remove o arquivo final parcial e os fragmentos.
+fn abort_upload(upload_dir: &Path, final_file_path: &Path) {
+    let _ = fs::remove_file(final_file_path);
+    cleanup_upload_dir(upload_dir);
+}
+
+/// Soma o tamanho de todos os fragmentos já gravados na sessão.
+fn chunk_total_size(upload_dir: &Path) -> u64 {
+    let mut total = 0u64;
+    if let Ok(entries) = fs::read_dir(upload_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("chunk") {
+                total += fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            }
+        }
+    }
+    total
 }
 
 pub async fn upload_chunk_handler(
@@ -90,11 +121,11 @@ pub async fn upload_chunk_handler(
     let chunk_path = upload_dir.join(format!("{}.chunk", chunk_index));
     let data_len = data.len();
     if let Err(e) = fs::write(&chunk_path, data) {
-        error!("upload_chunk_handler: falha ao gravar chunk {:?} (upload_id={}, chunk_index={}, bytes={}): {}", chunk_path, upload_id, chunk_index, data_len, e);
+        error!("upload_chunk_handler: falha ao gravar chunk {:?} (upload_id={}, chunk_index={}, bytes={}): {}", chunk_path, clean_id, chunk_index, data_len, e);
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
 
-    debug!("upload_chunk_handler: chunk gravado {:?} (upload_id={}, chunk_index={}, bytes={})", chunk_path, upload_id, chunk_index, data_len);
+    info!("upload_chunk_handler: chunk gravado {:?} (upload_id={}, chunk_index={}, bytes={})", chunk_path, clean_id, chunk_index, data_len);
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -191,16 +222,32 @@ pub async fn complete_upload_handler(
 
     if chunk_indices.is_empty() {
         warn!("complete_upload_handler: nenhuma fatia encontrada (upload_id={})", clean_id);
+        cleanup_upload_dir(&upload_dir);
         return Err((StatusCode::BAD_REQUEST, "Nenhuma fatia encontrada para montar o arquivo".to_string()));
     }
 
     chunk_indices.sort();
     debug!("complete_upload_handler: montando {} chunks (upload_id={}) para {:?}", chunk_indices.len(), clean_id, final_file_path);
 
+    // Limite total de upload: rejeita com 413 antes de montar (evita encher disco).
+    let total_size = chunk_total_size(&upload_dir);
+    if total_size > MAX_UPLOAD_TOTAL_BYTES {
+        warn!("complete_upload_handler: limite total excedido (upload_id={}, total_bytes={}, limite_bytes={})", clean_id, total_size, MAX_UPLOAD_TOTAL_BYTES);
+        cleanup_upload_dir(&upload_dir);
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!(
+                "Limite total de upload excedido: {} bytes (máximo permitido: {} bytes)",
+                total_size, MAX_UPLOAD_TOTAL_BYTES
+            ),
+        ));
+    }
+
     let mut output_file = match File::create(&final_file_path) {
         Ok(f) => f,
         Err(e) => {
             error!("complete_upload_handler: falha ao criar arquivo final {:?}: {}", final_file_path, e);
+            cleanup_upload_dir(&upload_dir);
             return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
         }
     };
@@ -213,6 +260,7 @@ pub async fn complete_upload_handler(
             Ok(f) => f,
             Err(e) => {
                 error!("complete_upload_handler: falha ao abrir chunk {:?}: {}", chunk_file_path, e);
+                abort_upload(&upload_dir, &final_file_path);
                 return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
             }
         };
@@ -222,6 +270,7 @@ pub async fn complete_upload_handler(
                 Ok(n) => n,
                 Err(e) => {
                     error!("complete_upload_handler: falha ao ler chunk {:?}: {}", chunk_file_path, e);
+                    abort_upload(&upload_dir, &final_file_path);
                     return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
                 }
             };
@@ -230,6 +279,7 @@ pub async fn complete_upload_handler(
             }
             if let Err(e) = output_file.write_all(&buf[..n]) {
                 error!("complete_upload_handler: falha ao escrever em {:?}: {}", final_file_path, e);
+                abort_upload(&upload_dir, &final_file_path);
                 return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
             }
         }
@@ -237,15 +287,14 @@ pub async fn complete_upload_handler(
 
     if let Err(e) = output_file.flush() {
         error!("complete_upload_handler: falha ao flush {:?}: {}", final_file_path, e);
+        abort_upload(&upload_dir, &final_file_path);
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
 
     let total_size = fs::metadata(&final_file_path).map(|m| m.len()).unwrap_or(0);
 
-    // Clean up temp chunks directory
-    if let Err(e) = fs::remove_dir_all(&upload_dir) {
-        warn!("complete_upload_handler: falha ao limpar diretório temporário {:?}: {}", upload_dir, e);
-    }
+    // Clean up temp chunks directory (always, even on success)
+    cleanup_upload_dir(&upload_dir);
 
     info!("complete_upload_handler: concluído com sucesso (upload_id={}, arquivo={:?}, size_bytes={})", clean_id, final_file_path, total_size);
 

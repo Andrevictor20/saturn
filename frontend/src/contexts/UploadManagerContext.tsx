@@ -40,6 +40,23 @@ const fetchWithTimeout = (
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutTimer));
 };
 
+// Estima a cota de armazenamento do navegador (IndexedDB) para decidir se é
+// seguro gravar o blob inteiro de um arquivo grande antes do upload.
+async function estimateIndexedDbQuota(): Promise<{ usage: number; quota: number; percentage: number } | null> {
+  if (typeof navigator.storage?.estimate !== 'function') return null;
+  try {
+    const est = await navigator.storage.estimate();
+    const quota = est.quota ?? 0;
+    const usage = est.usage ?? 0;
+    return { usage, quota, percentage: quota > 0 ? (usage / quota) * 100 : 0 };
+  } catch {
+    return null;
+  }
+}
+
+// Limiar a partir do qual pulamos a gravação do blob no IndexedDB (cota quase esgotada).
+const INDEXED_DB_QUOTA_WARN_PERCENT = 85;
+
 export interface UploadItem {
   id: string;
   fileName: string;
@@ -147,6 +164,13 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       // Throttle de UI: evita re-render da gaveta de progresso a cada chunk em arquivos grandes
       let lastReportedPercent = item.progress;
 
+      // Timeout dinâmico por chunk: arquivo maior => rede provavelmente mais lenta.
+      // Base 60s + 30s a cada 100MB do arquivo, teto 300s (5 min).
+      const chunkTimeoutMs = Math.min(
+        CHUNK_REQUEST_TIMEOUT_MS + Math.floor(file.size / (100 * 1024 * 1024)) * 30_000,
+        300_000,
+      );
+
       // 2. Upload missing chunks sequentially (com retry + timeout por requisição)
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         if (controller.signal.aborted) return;
@@ -185,7 +209,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
                 body: buildFormData(),
                 signal: controller.signal,
               },
-              CHUNK_REQUEST_TIMEOUT_MS,
+              chunkTimeoutMs,
             );
 
             if (chunkRes.ok) {
@@ -319,9 +343,27 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
     setIsDrawerOpen(true);
     setIsMinimized(false);
 
-    // Save to cache & IndexedDB for F5 reload persistence
+    // Cache em memória (sessão atual) independente do IndexedDB
     fileCacheRef.current.set(id, file);
-    await saveFileToDb(id, file);
+
+    // Persiste no IndexedDB para suporte a F5. Pula o blob quando a cota do
+    // navegador está quase esgotada para não falhar silenciosamente.
+    const quota = await estimateIndexedDbQuota();
+    const nearQuotaLimit = quota ? quota.percentage >= INDEXED_DB_QUOTA_WARN_PERCENT : false;
+
+    if (nearQuotaLimit) {
+      toast.error(t('files.upload_indexeddb_quota_low', { name: file.name, defaultValue: `Cota de armazenamento do navegador quase esgotada. "${file.name}" será enviado sem suporte a retomada após F5.` }));
+    } else {
+      try {
+        const result = await saveFileToDb(id, file);
+        if (!result.savedBlob) {
+          toast.error(t('files.upload_indexeddb_quota_exceeded', { name: file.name, defaultValue: `Sem cota no IndexedDB para "${file.name}". Retomada após F5 indisponível.` }));
+        }
+      } catch (err) {
+        console.error('[UploadManager] Falha ao persistir no IndexedDB:', err);
+        toast.error(t('files.upload_indexeddb_save_failed', { name: file.name, defaultValue: `Não foi possível preparar "${file.name}" para retomada após F5.` }));
+      }
+    }
 
     // Start upload process
     processUpload(newItem, file);
