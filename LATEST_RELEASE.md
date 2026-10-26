@@ -1,8 +1,11 @@
-# Saturn Dashboard v4.1.12
+# Saturn Dashboard v4.1.13
 
-### Novidades, Correções e Melhorias na Versão 4.1.12
+### Novidades, Correções e Melhorias na Versão 4.1.13
 
-### ✨ Melhoria: Tempo Estimado (ETA) no Upload de Arquivos
+### ✨ Melhoria: Destino do Arquivo no Drawer de Upload
+- **Caminho de destino exibido por item:** `UploadProgressDrawer` agora mostra o `destinationPath` de cada arquivo abaixo do nome, com ícone de disco rígido, para o usuário saber exatamente para onde o upload está sendo enviado (modo expandido do drawer).
+
+### ✨ Melhoria (v4.1.12): Tempo Estimado (ETA) no Upload de Arquivos
 - **ETA no drawer de upload:** `UploadManagerContext` agora calcula `etaSeconds` com base na velocidade atual e bytes pendentes; o `UploadProgressDrawer` exibe o tempo restante tanto no modo minimizado (pill flutuante) quanto no modo expandido (por item), formatado como "2m 30s", "45s" ou "1h 10m".
 
 ### 🐛 Correções (v4.1.11)
