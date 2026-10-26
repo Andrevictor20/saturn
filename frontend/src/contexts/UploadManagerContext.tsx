@@ -67,6 +67,7 @@ export interface UploadItem {
   uploadedChunks: number[];
   progress: number;
   speedMBs: number;
+  etaSeconds?: number; // tempo estimado restante em segundos
   status: 'uploading' | 'paused' | 'completed' | 'error';
   error?: string;
   createdAt: number;
@@ -259,10 +260,16 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         const shouldReport = progressPercent !== lastReportedPercent || uploadedCount % 4 === 0;
         if (shouldReport) {
           lastReportedPercent = progressPercent;
+          // Estima o tempo restante (ETA) com base na velocidade atual e bytes pendentes.
+          const bytesUploaded = uploadedCount * CHUNK_SIZE;
+          const bytesRemaining = Math.max(0, fileSize - bytesUploaded);
+          const speedBps = speed * 1024 * 1024;
+          const etaSeconds = speedBps > 0 ? Math.ceil(bytesRemaining / speedBps) : undefined;
           updateItem(item.id, {
             uploadedChunks: [...currentUploadedChunks],
             progress: progressPercent,
             speedMBs: speed,
+            ...(etaSeconds !== undefined ? { etaSeconds } : {}),
           });
         }
       }

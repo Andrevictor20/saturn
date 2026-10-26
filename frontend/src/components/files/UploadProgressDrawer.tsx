@@ -14,6 +14,17 @@ import { useTranslation } from 'react-i18next';
 import { useUploadManager } from '../../contexts/UploadManagerContext';
 import { formatBytes } from '../../utils/format';
 
+// Formata segundos em uma string legível de tempo restante (ex: "2m 30s", "45s", "1h 10m").
+function formatEta(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export function UploadProgressDrawer() {
   const { t } = useTranslation();
   const {
@@ -60,9 +71,16 @@ export function UploadProgressDrawer() {
               : t('files.upload_completed_single', { count: completedUploads.length, defaultValue: `${completedUploads.length} concluído(s)` })}
           </span>
           {totalSpeed > 0 && (
-            <span className="text-[11px] font-mono text-secondary">
-              • {totalSpeed.toFixed(1)} MB/s
-            </span>
+            <>
+              <span className="text-[11px] font-mono text-secondary">
+                • {totalSpeed.toFixed(1)} MB/s
+              </span>
+              {totalBytes > 0 && uploadedBytes < totalBytes && (
+                <span className="text-[11px] font-mono text-secondary ml-1">
+                  • ~{formatEta((totalBytes - uploadedBytes) / (totalSpeed * 1024 * 1024))} restante
+                </span>
+              )}
+            </>
           )}
           <ChevronUp className="w-4 h-4 text-secondary ml-1" />
         </button>
@@ -196,7 +214,9 @@ export function UploadProgressDrawer() {
                       <span className="text-amber-600 dark:text-amber-400">{t('files.upload_paused', 'Pausado')}</span>
                     ) : (
                       <span className="text-saturn-600 dark:text-saturn-400">
-                        {item.progress}% {item.speedMBs > 0 && `• ${item.speedMBs} MB/s`}
+                        {item.progress}%
+                        {item.speedMBs > 0 && `• ${item.speedMBs} MB/s`}
+                        {item.etaSeconds !== undefined && ` • ${formatEta(item.etaSeconds)} restante`}
                       </span>
                     )}
                   </div>
