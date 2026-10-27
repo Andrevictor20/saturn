@@ -255,7 +255,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
           lastReportedPercent = progressPercent;
           // Estima o tempo restante (ETA) com base na velocidade atual e bytes pendentes.
           const bytesUploaded = uploadedCount * CHUNK_SIZE;
-          const bytesRemaining = Math.max(0, fileSize - bytesUploaded);
+          const bytesRemaining = Math.max(0, item.fileSize - bytesUploaded);
           const speedBps = speed * 1024 * 1024;
           const etaSeconds = speedBps > 0 ? Math.ceil(bytesRemaining / speedBps) : undefined;
           updateItem(item.id, {

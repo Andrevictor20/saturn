@@ -3,8 +3,8 @@ import { render, waitFor } from '@testing-library/react';
 import {
   UploadManagerProvider,
   useUploadManager,
-  UploadItem,
 } from '../../../contexts/UploadManagerContext';
+import type { UploadItem } from '../../../contexts/UploadManagerContext';
 import * as uploadDb from '../../../utils/uploadDb';
 
 // --- Mocks de I/O externo (nunca mockar a unidade sob teste) ---
