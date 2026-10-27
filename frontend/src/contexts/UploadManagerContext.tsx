@@ -4,81 +4,26 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { saveFileToDb, getFileFromDb, removeFileFromDb } from '../utils/uploadDb';
 import { getAuthToken } from '../utils/auth';
+import type { UploadItem, UploadManagerContextType } from './uploadManagerTypes';
+
+import {
+  MAX_CHUNK_RETRIES,
+  CHUNK_REQUEST_TIMEOUT_MS,
+  sleep,
+  computeBackoffMs,
+  isRetryableStatus,
+  fetchWithTimeout,
+  waitForOnline,
+  acquireUploadKeepAlive,
+  estimateIndexedDbQuota,
+} from '../utils/uploadResilience';
 
 export const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk for high throughput & low overhead
-export const MAX_CHUNK_RETRIES = 3; // retry automático em falhas transitórias de rede
-export const CHUNK_RETRY_BACKOFF_MS = 1000; // backoff inicial entre tentativas (ms)
-export const CHUNK_REQUEST_TIMEOUT_MS = 60_000; // timeout por requisição de chunk (ms)
-
-// Pequeno atraso para backoff exponencial entre tentativas de chunk
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Fetch com timeout explícito; aborta o signal do upload se o timeout expirar
-const fetchWithTimeout = (
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> => {
-  let timeoutTimer: ReturnType<typeof setTimeout>;
-  const controller = new AbortController();
-  const promise = fetch(url, { ...init, signal: controller.signal });
-
-  const timeoutPromise = new Promise<Response>((_, reject) => {
-    timeoutTimer = setTimeout(() => {
-      controller.abort();
-      reject(new Error(`Tempo esgotado após ${timeoutMs / 1000}s`));
-    }, timeoutMs);
-  });
-
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutTimer));
-};
-
-// Estima a cota de armazenamento do navegador (IndexedDB) para decidir se é
-// seguro gravar o blob inteiro de um arquivo grande antes do upload.
-async function estimateIndexedDbQuota(): Promise<{ usage: number; quota: number; percentage: number } | null> {
-  if (typeof navigator.storage?.estimate !== 'function') return null;
-  try {
-    const est = await navigator.storage.estimate();
-    const quota = est.quota ?? 0;
-    const usage = est.usage ?? 0;
-    return { usage, quota, percentage: quota > 0 ? (usage / quota) * 100 : 0 };
-  } catch {
-    return null;
-  }
-}
 
 // Limiar a partir do qual pulamos a gravação do blob no IndexedDB (cota quase esgotada).
 const INDEXED_DB_QUOTA_WARN_PERCENT = 85;
 
-export interface UploadItem {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  destinationPath: string;
-  chunkSize: number;
-  totalChunks: number;
-  uploadedChunks: number[];
-  progress: number;
-  speedMBs: number;
-  etaSeconds?: number; // tempo estimado restante em segundos
-  status: 'uploading' | 'paused' | 'completed' | 'error';
-  error?: string;
-  createdAt: number;
-}
-
-interface UploadManagerContextType {
-  uploads: UploadItem[];
-  isDrawerOpen: boolean;
-  setIsDrawerOpen: (open: boolean) => void;
-  isMinimized: boolean;
-  setIsMinimized: (min: boolean) => void;
-  enqueueUpload: (file: File, destinationPath: string) => Promise<string>;
-  enqueueMultipleUploads: (files: File[], destinationPath: string) => Promise<void>;
-  pauseUpload: (id: string) => void;
-  resumeUpload: (id: string) => Promise<void>;
-  cancelUpload: (id: string) => void;
-  clearCompleted: () => void;
-}
+export type { UploadItem } from './uploadManagerTypes';
 
 const UploadManagerContext = createContext<UploadManagerContextType | undefined>(undefined);
 
@@ -105,6 +50,9 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const runningUploadsRef = useRef<Set<string>>(new Set());
 
+  const uploadsRef = useRef(uploads);
+  uploadsRef.current = uploads;
+
   // Persist uploads list metadata to localStorage
   useEffect(() => {
     try {
@@ -125,10 +73,12 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
     if (runningUploadsRef.current.has(item.id)) return;
     runningUploadsRef.current.add(item.id);
 
+    let failedPermanently = false;
     const controller = new AbortController();
     abortControllersRef.current.set(item.id, controller);
 
-    updateItem(item.id, { status: 'uploading', error: undefined });
+    updateItem(item.id, { status: 'uploading', error: undefined, retryable: false });
+    const releaseKeepAlive = acquireUploadKeepAlive();
 
     try {
       // 1. Check server status to resume existing chunks
@@ -190,9 +140,12 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
 
         let lastChunkError: Error | null = null;
         let chunkOk = false;
+        let fatalChunkError = false;
 
         for (let attempt = 0; attempt <= MAX_CHUNK_RETRIES; attempt++) {
           if (controller.signal.aborted) return;
+          // Sem rede: espera voltar em vez de queimar tentativas.
+          if (!(await waitForOnline(controller.signal))) return;
 
           try {
             const chunkRes = await fetchWithTimeout(
@@ -211,25 +164,25 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
               break;
             }
 
-            // Erros 4xx (exceto 429/5xx transitórios) não se beneficiam de retry
             const errText = await chunkRes.text().catch(() => 'Falha no chunk');
-            if (chunkRes.status === 429 || chunkRes.status >= 500) {
-              lastChunkError = new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
-            } else {
-              throw new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
+            lastChunkError = new Error(errText || `Falha no envio do bloco ${chunkIndex + 1}`);
+            // Erros 4xx (exceto 408/429) não se beneficiam de retry
+            if (!isRetryableStatus(chunkRes.status)) {
+              fatalChunkError = true;
+              break;
             }
           } catch (err: any) {
-            if (err?.name === 'AbortError') return;
+            if (err?.name === 'AbortError' && controller.signal.aborted) return;
             lastChunkError = err;
           }
 
           if (attempt < MAX_CHUNK_RETRIES) {
-            const backoff = CHUNK_RETRY_BACKOFF_MS * Math.pow(2, attempt);
-            await sleep(backoff);
+            await sleep(computeBackoffMs(attempt));
           }
         }
 
         if (!chunkOk) {
+          if (fatalChunkError) failedPermanently = true;
           throw lastChunkError || new Error(`Falha no envio do bloco ${chunkIndex + 1}`);
         }
 
@@ -311,10 +264,12 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       updateItem(item.id, {
         status: 'error',
         error: err?.message || 'Erro inesperado no envio',
+        retryable: !failedPermanently,
         speedMBs: 0,
       });
       toast.error(`Falha no upload de "${item.fileName}": ${err?.message || 'Erro de rede'}`);
     } finally {
+      releaseKeepAlive();
       runningUploadsRef.current.delete(item.id);
       abortControllersRef.current.delete(item.id);
     }
@@ -455,6 +410,30 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
     hydrateActiveUploads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-retomada: ao voltar a rede ou a aba ficar visível, reinicia uploads que
+  // pararam sem ação do usuário (aba congelada/descartada, queda de rede).
+  useEffect(() => {
+    const resumeStalled = async () => {
+      if (document.visibilityState === 'hidden' || navigator.onLine === false) return;
+      for (const item of uploadsRef.current) {
+        const stalled = item.status === 'uploading' && !runningUploadsRef.current.has(item.id);
+        const recoverable = item.status === 'error' && item.retryable === true;
+        if (!stalled && !recoverable) continue;
+        if (runningUploadsRef.current.has(item.id)) continue;
+        const file = fileCacheRef.current.get(item.id) ?? (await getFileFromDb(item.id));
+        if (!file) continue;
+        fileCacheRef.current.set(item.id, file);
+        processUpload(item, file);
+      }
+    };
+    window.addEventListener('online', resumeStalled);
+    document.addEventListener('visibilitychange', resumeStalled);
+    return () => {
+      window.removeEventListener('online', resumeStalled);
+      document.removeEventListener('visibilitychange', resumeStalled);
+    };
+  }, [processUpload]);
 
   return (
     <UploadManagerContext.Provider

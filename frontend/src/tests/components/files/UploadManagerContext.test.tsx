@@ -195,4 +195,52 @@ describe('UploadManagerContext — hidratação de uploads com erro após F5', (
       expect.objectContaining({ signal: expect.anything() })
     );
   });
+
+  it('AC5: item com erro retryable é retomado automaticamente quando a aba volta a ficar visível', async () => {
+    const item = makeUploadItem({ status: 'error', retryable: true });
+    localStorage.setItem('saturn_active_uploads', JSON.stringify([item]));
+    (uploadDb.getFileFromDb as any).mockResolvedValue(mockFile);
+
+    render(
+      <UploadManagerProvider>
+        <ContextCapture />
+      </UploadManagerProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedCtx!.uploads.length).toBe(1);
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/files/upload/status?upload_id=upl-error-1',
+        expect.objectContaining({ signal: expect.anything() })
+      );
+    });
+  });
+
+  it('AC6: item com erro não retryable (4xx) NÃO é retomado automaticamente', async () => {
+    const item = makeUploadItem({ status: 'error', retryable: false });
+    localStorage.setItem('saturn_active_uploads', JSON.stringify([item]));
+    (uploadDb.getFileFromDb as any).mockResolvedValue(mockFile);
+
+    render(
+      <UploadManagerProvider>
+        <ContextCapture />
+      </UploadManagerProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedCtx!.uploads.length).toBe(1);
+    });
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(capturedCtx!.uploads[0].status).toBe('error');
+  });
 });
